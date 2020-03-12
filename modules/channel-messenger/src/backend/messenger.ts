@@ -305,7 +305,12 @@ export class MessengerClient {
     await this._callEndpoint('/messages', body)
   }
 
-  async sendTextMessage(senderId: string, message: string) {
+  async sendTextMessage(senderId: string, message: { [key: string]: any }) {
+    const okKeys = ['text', 'quick_replies', 'metadata', 'attachment']
+    Object.keys(message).forEach(key => {
+      if (!okKeys.includes(key)) delete message[key]
+    })
+
     const body = {
       recipient: {
         id: senderId
