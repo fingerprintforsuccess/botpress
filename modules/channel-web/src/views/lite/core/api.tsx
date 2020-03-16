@@ -12,7 +12,7 @@ export default class WebchatApi {
     this.axios = axiosInstance
     this.axios.interceptors.request.use(
       config => {
-        if (!config.url.includes('/botInfo') && !config.url.includes('/setup')) {
+        if (!config.url.includes('/botInfo')) {
           const prefix = config.url.indexOf('?') > 0 ? '&' : '?'
           config.url += prefix + '__ts=' + new Date().getTime()
         }
@@ -44,20 +44,6 @@ export default class WebchatApi {
           'X-BP-ExternalAuth': `Bearer ${externalAuthToken}`
         }
       }
-    }
-  }
-
-  async setup(convId, msg) {
-    try {
-      const data = {
-        botId: window.BOT_ID,
-        userId: this.userId,
-        convId,
-        msg
-      }
-      return this.axios.post(`/setup`, data, this.axiosConfig)
-    } catch (err) {
-      await this.handleApiError(err)
     }
   }
 

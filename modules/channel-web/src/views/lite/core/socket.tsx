@@ -44,12 +44,6 @@ export default class BpSocket {
   /** Waits until the VISITOR ID is set  */
   public waitForUserId(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (window.__BP_VISITOR_ID) {
-        this.userId = window.__BP_VISITOR_ID
-        this.onUserIdChanged(this.userId)
-        this.postToParent('', { userId: this.userId })
-        resolve()
-      }
       const interval = setInterval(() => {
         if (window.__BP_VISITOR_ID) {
           clearInterval(interval)
@@ -59,12 +53,12 @@ export default class BpSocket {
           this.postToParent('', { userId: this.userId })
           resolve()
         }
-      }, 10)
+      }, 250)
 
       setTimeout(() => {
         clearInterval(interval)
         reject()
-      }, 10000)
+      }, 300000)
     })
   }
 }
