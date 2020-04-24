@@ -40,6 +40,16 @@ class MessageList extends React.Component<MessageListProps, State> {
       this.tryScrollToBottom()
     })
 
+    observe(this.props.isBotTyping, v => {
+      if (this.state.manualScroll) {
+        if (!this.state.showNewMessageIndicator) {
+          this.setState({ showNewMessageIndicator: true })
+        }
+        return
+      }
+      this.tryScrollToBottom()
+    })
+
     // this should account for keyboard rendering as it triggers a resize of the messagesDiv
     this.divSizeObserver = new ResizeObserver(
       debounce(
@@ -142,7 +152,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     })
 
     if (this.props.isBotTyping.get()) {
-      if (lastSpeaker !== 'bot') {
+      if (lastSpeaker?.toLowerCase() !== 'bot') {
         currentGroup = []
         groups.push(currentGroup)
       }

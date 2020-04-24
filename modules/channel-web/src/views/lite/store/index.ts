@@ -124,6 +124,9 @@ class RootStore {
 
     this.currentConversation.messages.push({ ...event, conversationId: +event.conversationId })
     this.currentConversation.typingUntil = event.userId ? this.currentConversation.typingUntil : undefined
+    if (!this.currentConversation.typingUntil) {
+      this._expireTyping()
+    }
   }
 
   @action.bound
@@ -134,7 +137,7 @@ class RootStore {
       return
     }
 
-    this.currentConversation.typingUntil = new Date(Date.now() + event.timeInMs)
+    this.currentConversation.typingUntil = new Date(Date.now() + event.timeInMs + 10000)
     this._startTypingTimer()
   }
 
