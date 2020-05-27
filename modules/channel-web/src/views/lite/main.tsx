@@ -206,8 +206,8 @@ class Web extends React.Component<MainProps> {
       return
     }
 
-    const audio = new Audio(`${window.ROOT_PATH}/assets/modules/channel-web/notification.mp3`)
-    await audio.play()
+    // const audio = new Audio(`${window.ROOT_PATH}/assets/modules/channel-web/notification.mp3`)
+    // await audio.play()
 
     this.setState({ played: true })
 
