@@ -58,3 +58,7 @@ build/tests/e2e/screenshots/*
 /internal-modules
 /private-modules
 /src/bp/ml/node-svm
+
+modules/*.tgz
+modules/*/*.tgz
+modules/.cache
