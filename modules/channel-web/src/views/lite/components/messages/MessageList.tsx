@@ -102,6 +102,7 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   renderDate(date) {
+    return null;
     return (
       <div className={'bpw-date-container'}>
         {this.props.intl.formatTime(new Date(date), {
@@ -190,6 +191,7 @@ class MessageList extends React.Component<MessageListProps, State> {
                 key={`msg-group-${i}`}
                 isLastGroup={i >= groups.length - 1}
                 messages={group}
+                onLoad={this.tryScrollToBottom}
               />
             </div>
           )

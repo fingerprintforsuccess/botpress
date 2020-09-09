@@ -82,6 +82,7 @@ class MessageGroup extends React.Component<Props> {
                   onFileUpload={this.props.onFileUpload}
                   bp={this.props.bp}
                   store={this.props.store}
+                  onLoad={this.props.onLoad}
                 />
               )
             })}
@@ -112,4 +113,5 @@ type Props = {
   onSendData?: any
   store?: RootStore
   highlightedMessages?: string[]
+  onLoad?: any
 } & Pick<StoreDef, 'showUserName' | 'messageWrapper' | 'bp'>

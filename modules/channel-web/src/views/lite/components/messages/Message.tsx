@@ -17,6 +17,10 @@ class Message extends Component<MessageProps> {
   static getDerivedStateFromError(_error) {
     return { hasError: true }
   }
+  
+  componentDidMount() {
+	if (this.props.onLoad) this.props.onLoad();
+  }
 
   render_text(textMessage?: string) {
     const { text, markdown } = this.props.payload
@@ -57,7 +61,7 @@ class Message extends Component<MessageProps> {
   }
 
   render_file() {
-    return <FileMessage file={this.props.payload} escapeTextHTML={this.props.store.escapeHTML} />
+    return <FileMessage file={this.props.payload} escapeTextHTML={this.props.store.escapeHTML} onLoad={this.props.onLoad} />
   }
 
   render_custom() {

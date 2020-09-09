@@ -34,6 +34,7 @@ export namespace Renderer {
     noBubble?: boolean
     keyboard?: any
     eventId?: string
+    onLoad?: any
 
     isHighlighted?: boolean
     isLastGroup?: boolean
@@ -77,6 +78,7 @@ export namespace Renderer {
       text: string
     }
     escapeTextHTML: boolean
+    onLoad?: any
   }
 
   export interface FileInput {
