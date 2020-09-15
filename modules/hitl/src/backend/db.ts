@@ -279,7 +279,7 @@ export default class HitlDb {
     return this.knex('hitl_messages')
       .where({ session_id: sessionId })
       .orderBy('id', 'asc')
-      .limit(100)
+      .limit(1000)
       .select('*')
       .then(messages =>
         messages.map(msg => ({
