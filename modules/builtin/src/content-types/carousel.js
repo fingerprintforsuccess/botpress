@@ -8,7 +8,7 @@ function render(data) {
   if (data.typing) {
     events.push({
       type: 'typing',
-      value: data.typing
+      value: (data.delay || 0)
     })
   }
 
