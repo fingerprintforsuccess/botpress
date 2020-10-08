@@ -89,7 +89,6 @@ export default class HitlDb {
       botId: event.botId,
       channel: event.channel,
       userId: event.target,
-      thread_id: event.threadId,
       user_image_url: profileUrl,
       last_event_on: this.knex.date.now(),
       last_heard_on: this.knex.date.now(),
@@ -108,13 +107,8 @@ export default class HitlDb {
       return undefined
     }
 
-    const where = { botId: event.botId, channel: event.channel, userId: event.target }
-    if (event.threadId) {
-      where['thread_id'] = event.threadId
-    }
-
     return this.knex('hitl_sessions')
-      .where(where)
+      .where({ botId: event.botId, channel: event.channel, userId: event.target })
       .select('*')
       .limit(1)
       .then(users => {
@@ -138,7 +132,6 @@ export default class HitlDb {
             botId: res.botId,
             channel: res.channel,
             userId: res.userId,
-            threadId: res.thread_id,
             fullName: res.full_name,
             profileUrl: res.user_image_url,
             lastEventOn: res.last_event_on,
@@ -232,7 +225,7 @@ export default class HitlDb {
   }
 
   async setSessionPauseState(isPaused: boolean, session: SessionIdentity, trigger: string): Promise<number> {
-    const { botId, channel, userId, sessionId, threadId } = session
+    const { botId, channel, userId, sessionId } = session
 
     if (sessionId) {
       return this.knex('hitl_sessions')
@@ -240,16 +233,12 @@ export default class HitlDb {
         .update({ paused: isPaused ? 1 : 0, paused_trigger: trigger })
         .then(() => parseInt(sessionId))
     } else {
-      const where = { botId, channel, userId }
-      if (threadId) {
-        where['thread_id'] = threadId
-      }
       return this.knex('hitl_sessions')
-        .where(where)
+        .where({ botId, channel, userId })
         .update({ paused: isPaused ? 1 : 0, paused_trigger: trigger })
         .then(() => {
           return this.knex('hitl_sessions')
-            .where(where)
+            .where({ botId, channel, userId })
             .select('id')
         })
         .then(sessions => parseInt(sessions[0].id))
@@ -257,10 +246,10 @@ export default class HitlDb {
   }
 
   async isSessionPaused(session: SessionIdentity): Promise<boolean> {
-    const { botId, channel, userId, sessionId, threadId } = session
+    const { botId, channel, userId, sessionId } = session
 
     return this.knex('hitl_sessions')
-      .where(sessionId ? { id: sessionId } : { botId, channel, userId, threadId })
+      .where(sessionId ? { id: sessionId } : { botId, channel, userId })
       .select('paused')
       .then()
       .get(0)
@@ -303,7 +292,6 @@ export default class HitlDb {
           id: res.session_id,
           botId: res.botId,
           channel: res.channel,
-          threadId: res.thread_id,
           lastEventOn: res.last_event_on,
           lastHeardOn: res.last_heard_on,
           isPaused: res.paused,
@@ -335,7 +323,7 @@ export default class HitlDb {
         this.from('hitl_messages')
           .where({ session_id: sessionId })
           .orderBy('ts', 'desc')
-          .limit(1000)
+          .limit(100)
           .select('*')
           .as('q1')
       })

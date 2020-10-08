@@ -36,6 +36,7 @@ const entryPoint: sdk.ModuleEntryPoint = {
   onServerStarted,
   onServerReady,
   onModuleUnmount,
+  translations: { en, fr },
   definition: {
     name: 'hitl',
     menuIcon: 'feedback',
