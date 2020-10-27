@@ -316,7 +316,16 @@ export default class HitlDb {
   }
 
   async getSessionMessages(sessionId: string): Promise<Message[]> {
-    return this.knex
+    let knex = this.knex;
+    
+    let user = await this.knex
+      .select('srv_channel_users.attributes')
+      .from('hitl_sessions')
+      .join('srv_channel_users', knex.raw('srv_channel_users.user_id'), 'hitl_sessions.userId')
+      .where({ 'hitl_sessions.id': sessionId })
+      .first()
+    
+    let q = this.knex
       .orderBy('ts', 'asc')
       .select('*')
       .from(function() {
@@ -327,11 +336,21 @@ export default class HitlDb {
           .select('*')
           .as('q1')
       })
-      .then(messages =>
-        messages.map(msg => ({
-          ...msg,
-          raw_message: this.knex.json.get(msg.raw_message)
-        }))
+    
+    return q.then(messages =>
+        messages.map(msg => {
+          let processed = { ...msg }
+          
+          let sub = 'Joe';
+          if (user.attributes.gender === 'male') sub = 'John';
+          else if (user.attributes.gender === 'female') sub = 'Jane';
+
+          if (user.attributes.userName) {
+            if (processed.text) processed.text = processed.text.split(user.attributes.userName).join(sub);
+            if (processed.raw_message.text) processed.raw_message.text = processed.raw_message.text.split(user.attributes.userName).join(sub);
+          }
+          return processed
+        })
       )
   }
 
