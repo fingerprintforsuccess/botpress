@@ -296,7 +296,7 @@ export default class HitlDb {
           lastHeardOn: res.last_heard_on,
           isPaused: res.paused,
           pausedBy: res.paused_trigger,
-          lastMessage: {
+          lastMessage: this.anonymizeMessage(res.attributes, {
             id: res.mId,
             type: res.type,
             source: res.source,
@@ -304,7 +304,7 @@ export default class HitlDb {
             raw_message: res.raw_message,
             direction: res.direction,
             ts: res.ts
-          },
+          }),
           user: {
             id: res.userId,
             fullName: res.full_name,
@@ -337,21 +337,21 @@ export default class HitlDb {
           .as('q1')
       })
     
-    return q.then(messages =>
-        messages.map(msg => {
-          let processed = { ...msg }
-          
-          let sub = 'Joe';
-          if (user.attributes.gender === 'male') sub = 'John';
-          else if (user.attributes.gender === 'female') sub = 'Jane';
-
-          if (user.attributes.userName) {
-            if (processed.text) processed.text = processed.text.split(user.attributes.userName).join(sub);
-            if (processed.raw_message.text) processed.raw_message.text = processed.raw_message.text.split(user.attributes.userName).join(sub);
-          }
-          return processed
-        })
-      )
+    return q.then(messages => messages.map((msg) => this.anonymizeMessage(user.attributes, msg)))
+  }
+  
+  anonymizeMessage(user, message) {
+     let processed = { ...message }
+     
+     let sub = 'Zoe';
+     if (user.gender === 'male') sub = 'John';
+     else if (user.gender === 'female') sub = 'Jane';
+     
+     if (user.userName) {
+       if (processed.text) processed.text = processed.text.split(user.userName).join(sub);
+       if (processed.raw_message.text) processed.raw_message.text = processed.raw_message.text.split(user.userName).join(sub);
+     }
+     return processed
   }
 
   async searchSessions(searchTerm: string): Promise<string[]> {
