@@ -59,6 +59,11 @@ build/tests/e2e/screenshots/*
 /private-modules
 /src/bp/ml/node-svm
 
+# tests output
+cache
+
+modules/*/dist/*
+modules/*/assets/web/*
 modules/*.tgz
 modules/*/*.tgz
 modules/.cache

@@ -1,5 +1,6 @@
 import { Tag } from '@blueprintjs/core'
 import { NLU } from 'botpress/sdk'
+import { lang } from 'botpress/shared'
 import classnames from 'classnames'
 import _ from 'lodash'
 import React from 'react'
@@ -13,11 +14,11 @@ import { makeSlotMark, utterancesToValue, valueToUtterances } from './utterances
 
 const plugins = [
   PlaceholderPlugin({
-    placeholder: 'Summary of intent',
+    placeholder: lang.tr('module.nlu.intents.summaryPlaceholder'),
     when: (_, node) => node.text.trim() === '' && node.type === 'title'
   }),
   PlaceholderPlugin({
-    placeholder: 'Type a sentence',
+    placeholder: lang.tr('module.nlu.intents.utterancePlaceholder'),
     when: (_, node) => node.text.trim() === '' && node.type === 'paragraph'
   })
 ]
@@ -101,13 +102,14 @@ export class UtterancesEditor extends React.Component<Props> {
   onBlur = (event, editor: CoreEditor, next) => {
     const newUtts = valueToUtterances(editor.value)
     if (!_.isEqual(this.props.utterances, newUtts)) {
-      this.props.onChange(newUtts)
+      this.dispatchChanges(editor.value)
     }
 
     return next()
   }
 
   render() {
+
     return (
       <Editor
         value={this.state.value}
@@ -137,9 +139,27 @@ export class UtterancesEditor extends React.Component<Props> {
           show={this.state.showSlotMenu}
           onSlotClicked={this.tag.bind(this, editor)}
         />
-        <div className={style.utterances}>{children}</div>
+        <div className={style.utterances} onCopy={this.onCopy}>{children}</div>
       </div>
     )
+  }
+
+  onCopy = event => {
+    const selection = document.getSelection().toString()
+    let lines: string[]
+    if (!selection.length) {
+      // Selected the whole component, we put all utterances in the clipboard
+      lines = valueToUtterances(this.state.value)
+    } else {
+      // Partial selection, we remove the heading numbers and empty lines
+      lines = selection.split('\n').map(txt =>
+        txt.replace(/^\d{1,4}$/, '')
+      ).filter(x => x.length)
+    }
+
+    event.clipboardData.setData('text/plain', lines.join('\n'))
+    event.clipboardData.setData('text/html', `<ul>${lines.map(x => `<li>${x}</li>`).join('')}</ul>`)
+    event.preventDefault()
   }
 
   tag = (editor: CoreEditor, slot: NLU.SlotDefinition) => {
@@ -232,7 +252,7 @@ export class UtterancesEditor extends React.Component<Props> {
       case 'paragraph':
         const utterance = (
           <p className={elementCx} {...attributes}>
-            <span contentEditable={false} className={style.index}>
+            <span contentEditable={false} className={style.index} unselectable="on">
               {utteranceIdx + 1}
             </span>
             {children}
@@ -282,6 +302,7 @@ export class UtterancesEditor extends React.Component<Props> {
       from = Math.min(selection.anchor.offset, selection.focus.offset)
       to = Math.max(selection.anchor.offset, selection.focus.offset)
 
+
       if (from !== to) {
         if (selection.isFocused) {
           this.showSlotPopover()
@@ -290,7 +311,7 @@ export class UtterancesEditor extends React.Component<Props> {
           // need the setTimeout for tagging with click
           setTimeout(this.hideSlotPopover, 200)
         }
-      } else if (from == to && this.state.showSlotMenu) {
+      } else if (from === to && this.state.showSlotMenu) {
         this.hideSlotPopover()
       }
     } else {

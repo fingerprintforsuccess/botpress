@@ -2,11 +2,12 @@ import { DirectoryListingOptions, ListenHandle, Logger, UpsertOptions } from 'bo
 import { ObjectCache } from 'common/object-cache'
 import { isValidBotId } from 'common/validation'
 import { BotConfig } from 'core/config/bot.config'
-import { asBytes, filterByGlobs, forceForwardSlashes } from 'core/misc/utils'
+import { asBytes, filterByGlobs, forceForwardSlashes, sanitize } from 'core/misc/utils'
 import { diffLines } from 'diff'
 import { EventEmitter2 } from 'eventemitter2'
 import fse from 'fs-extra'
 import { inject, injectable, tagged } from 'inversify'
+import jsonlintMod from 'jsonlint-mod'
 import _ from 'lodash'
 import minimatch from 'minimatch'
 import mkdirp from 'mkdirp'
@@ -22,7 +23,7 @@ import { FileRevision, PendingRevisions, ReplaceContent, ServerWidePendingRevisi
 import DBStorageDriver from './db-driver'
 import DiskStorageDriver from './disk-driver'
 
-export type BpfsScopedChange = {
+export interface BpfsScopedChange {
   // An undefined bot ID = global
   botId: string | undefined
   // The list of local files which will overwrite their remote counterpart
@@ -40,7 +41,13 @@ export interface FileChange {
 
 export type FileChangeAction = 'add' | 'edit' | 'del'
 
-const MAX_GHOST_FILE_SIZE = '100mb'
+interface ScopedGhostOptions {
+  botId?: string
+  // Archive upload requires the full path, including drive letter, so it should not be sanitized
+  noSanitize?: boolean
+}
+
+const MAX_GHOST_FILE_SIZE = process.core_env.BP_BPFS_MAX_FILE_SIZE || '100mb'
 const bpfsIgnoredFiles = ['models/**', 'data/bots/*/models/**', '**/*.js.map']
 const GLOBAL_GHOST_KEY = '__global__'
 const BOTS_GHOST_KEY = '__bots__'
@@ -77,8 +84,8 @@ export class GhostService {
   }
 
   // Not caching this scope since it's rarely used
-  root(): ScopedGhostService {
-    return new ScopedGhostService(`./data`, this.diskDriver, this.dbDriver, this.useDbDriver, this.cache, this.logger)
+  root(useDbDriver?: boolean): ScopedGhostService {
+    return new ScopedGhostService('./data', this.diskDriver, this.dbDriver, useDbDriver ?? this.useDbDriver, this.cache)
   }
 
   global(): ScopedGhostService {
@@ -87,12 +94,11 @@ export class GhostService {
     }
 
     const scopedGhost = new ScopedGhostService(
-      `./data/global`,
+      './data/global',
       this.diskDriver,
       this.dbDriver,
       this.useDbDriver,
-      this.cache,
-      this.logger
+      this.cache
     )
 
     this._scopedGhosts.set(GLOBAL_GHOST_KEY, scopedGhost)
@@ -100,7 +106,7 @@ export class GhostService {
   }
 
   custom(baseDir: string) {
-    return new ScopedGhostService(baseDir, this.diskDriver, this.dbDriver, false, this.cache, this.logger)
+    return new ScopedGhostService(baseDir, this.diskDriver, this.dbDriver, false, this.cache, { noSanitize: true })
   }
 
   // TODO: refactor this
@@ -227,12 +233,11 @@ export class GhostService {
     }
 
     const scopedGhost = new ScopedGhostService(
-      `./data/bots`,
+      './data/bots',
       this.diskDriver,
       this.dbDriver,
       this.useDbDriver,
-      this.cache,
-      this.logger
+      this.cache
     )
 
     this._scopedGhosts.set(BOTS_GHOST_KEY, scopedGhost)
@@ -254,8 +259,7 @@ export class GhostService {
       this.dbDriver,
       this.useDbDriver,
       this.cache,
-      this.logger,
-      botId
+      { botId }
     )
 
     const listenForUnmount = args => {
@@ -341,11 +345,13 @@ export class ScopedGhostService {
     private dbDriver: DBStorageDriver,
     private useDbDriver: boolean,
     private cache: ObjectCache,
-    private logger: Logger,
-    private botId?: string
+    private options: ScopedGhostOptions = {
+      botId: undefined,
+      noSanitize: true
+    }
   ) {
     if (![-1, this.baseDir.length - 1].includes(this.baseDir.indexOf('*'))) {
-      throw new Error(`Base directory can only contain '*' at the end of the path`)
+      throw new Error("Base directory can only contain '*' at the end of the path")
     }
 
     this.isDirectoryGlob = this.baseDir.endsWith('*')
@@ -357,24 +363,27 @@ export class ScopedGhostService {
    * This is a temporary workaround to lock bots marked as "locked" until modules are correctly updated.
    */
   private async _assertBotUnlocked(directory: string, file?: string) {
-    if (!this.botId || directory.startsWith('./models')) {
+    if (!this.options.botId || directory.startsWith('./models')) {
       return
     }
 
     if (await this.fileExists('/', 'bot.config.json')) {
       const config = await this.readFileAsObject<BotConfig>('/', 'bot.config.json')
       if (config.locked) {
-        throw new Error(`Bot locked`)
+        throw new Error('Bot locked')
       }
     }
   }
 
   private _normalizeFolderName(rootFolder: string) {
-    return forceForwardSlashes(path.join(this.baseDir, rootFolder))
+    const folder = forceForwardSlashes(path.join(this.baseDir, rootFolder))
+    return this.options.noSanitize ? folder : sanitize(folder, 'folder')
   }
 
   private _normalizeFileName(rootFolder: string, file: string) {
-    return forceForwardSlashes(path.join(this._normalizeFolderName(rootFolder), file))
+    const fullPath = path.join(rootFolder, file)
+    const folder = this._normalizeFolderName(path.dirname(fullPath))
+    return forceForwardSlashes(path.join(folder, sanitize(path.basename(fullPath))))
   }
 
   objectCacheKey = str => `object::${str}`
@@ -418,7 +427,7 @@ export class ScopedGhostService {
     }
 
     if (this.isDirectoryGlob) {
-      throw new Error(`Ghost can't read or write under this scope`)
+      throw new Error("Ghost can't read or write under this scope")
     }
 
     const fileName = this._normalizeFileName(rootFolder, file)
@@ -431,7 +440,7 @@ export class ScopedGhostService {
     await this._invalidateFile(fileName)
 
     if (options.syncDbToDisk) {
-      await this.cache.sync(JSON.stringify({ rootFolder, botId: this.botId }))
+      await this.cache.sync(JSON.stringify({ rootFolder, botId: this.options.botId }))
     }
   }
 
@@ -540,7 +549,7 @@ export class ScopedGhostService {
 
   async readFileAsBuffer(rootFolder: string, file: string): Promise<Buffer> {
     if (this.isDirectoryGlob) {
-      throw new Error(`Ghost can't read or write under this scope`)
+      throw new Error("Ghost can't read or write under this scope")
     }
 
     const fileName = this._normalizeFileName(rootFolder, file)
@@ -565,7 +574,16 @@ export class ScopedGhostService {
 
     if (!(await this.cache.has(cacheKey))) {
       const value = await this.readFileAsString(rootFolder, file)
-      const obj = <T>JSON.parse(value)
+      let obj
+      try {
+        obj = <T>JSON.parse(value)
+      } catch (e) {
+        try {
+          jsonlintMod.parse(value)
+        } catch (e) {
+          throw new Error(`SyntaxError in your JSON: ${file}: \n ${e}`)
+        }
+      }
       await this.cache.set(cacheKey, obj)
       return obj
     }
@@ -591,7 +609,7 @@ export class ScopedGhostService {
   async deleteFile(rootFolder: string, file: string): Promise<void> {
     await this._assertBotUnlocked(rootFolder, file)
     if (this.isDirectoryGlob) {
-      throw new Error(`Ghost can't read or write under this scope`)
+      throw new Error("Ghost can't read or write under this scope")
     }
 
     const fileName = this._normalizeFileName(rootFolder, file)
@@ -624,7 +642,7 @@ export class ScopedGhostService {
   async deleteFolder(folder: string): Promise<void> {
     await this._assertBotUnlocked(folder)
     if (this.isDirectoryGlob) {
-      throw new Error(`Ghost can't read or write under this scope`)
+      throw new Error("Ghost can't read or write under this scope")
     }
 
     const folderName = this._normalizeFolderName(folder)

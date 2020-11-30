@@ -2,6 +2,7 @@ import { observe } from 'mobx'
 import { inject, observer } from 'mobx-react'
 import React from 'react'
 
+import MoreOptions from '../../../../../../src/bp/ui-shared-lite/MoreOptions'
 import Close from '../icons/Close'
 import Download from '../icons/Download'
 import Information from '../icons/Information'
@@ -15,7 +16,8 @@ class Header extends React.Component<HeaderProps> {
   private btnEls: { [index: number]: HTMLElement } = {}
 
   state = {
-    currentFocusIdx: undefined
+    currentFocusIdx: undefined,
+    showingOption: false
   }
 
   componentDidMount() {
@@ -48,7 +50,7 @@ class Header extends React.Component<HeaderProps> {
       }
     }
 
-    if (idx == Object.keys(this.btnEls).length) {
+    if (idx === Object.keys(this.btnEls).length) {
       this.onBlur()
       this.props.focusNext()
     }
@@ -74,7 +76,8 @@ class Header extends React.Component<HeaderProps> {
 
   renderResetButton() {
     return (
-      <span
+      <button
+        type="button"
         tabIndex={-1}
         id="btn-reset"
         ref={el => (this.btnEls[0] = el)}
@@ -84,13 +87,14 @@ class Header extends React.Component<HeaderProps> {
         onBlur={this.onBlur}
       >
         <Reload />
-      </span>
+      </button>
     )
   }
 
   renderDownloadButton() {
     return (
-      <span
+      <button
+        type="button"
         tabIndex={-1}
         id="btn-download"
         ref={el => (this.btnEls[1] = el)}
@@ -100,13 +104,14 @@ class Header extends React.Component<HeaderProps> {
         onBlur={this.onBlur}
       >
         <Download />
-      </span>
+      </button>
     )
   }
 
   renderConvoButton() {
     return (
-      <span
+      <button
+        type="button"
         tabIndex={-1}
         id="btn-conversations"
         ref={el => (this.btnEls[2] = el)}
@@ -116,13 +121,14 @@ class Header extends React.Component<HeaderProps> {
         onBlur={this.onBlur}
       >
         <List />
-      </span>
+      </button>
     )
   }
 
   renderBotInfoButton() {
     return (
-      <span
+      <button
+        type="button"
         tabIndex={-1}
         id="btn-botinfo"
         ref={el => (this.btnEls[3] = el)}
@@ -132,15 +138,19 @@ class Header extends React.Component<HeaderProps> {
         onBlur={this.onBlur}
       >
         <Information />
-      </span>
+      </button>
     )
   }
 
   renderCloseButton() {
     return (
-      <span
-        tabIndex={-1}
+      <button
+        type="button"
         id="btn-close"
+        aria-label={this.props.intl.formatMessage({
+          id: 'header.hideChatWindow',
+          defaultMessage: 'Hide the chat window'
+        })}
         ref={el => (this.btnEls[4] = el)}
         className={'bpw-header-icon bpw-header-icon-close'}
         onClick={this.props.hideChat}
@@ -148,7 +158,7 @@ class Header extends React.Component<HeaderProps> {
         onBlur={this.onBlur}
       >
         <Close />
-      </span>
+      </button>
     )
   }
 
@@ -156,7 +166,8 @@ class Header extends React.Component<HeaderProps> {
     return this.props.customButtons.map(btn => {
       const Icon: any = btn.icon
       return (
-        <span
+        <button
+          type="button"
           key={btn.id}
           id={`btn-${btn.id}`}
           tabIndex={-1}
@@ -165,7 +176,7 @@ class Header extends React.Component<HeaderProps> {
           title={btn.label || ''}
         >
           {typeof Icon === 'function' ? <Icon /> : Icon}
-        </span>
+        </button>
       )
     })
   }
@@ -175,21 +186,63 @@ class Header extends React.Component<HeaderProps> {
       return
     }
 
-    if (e.key == 'ArrowUp') {
+    if (e.key === 'ArrowUp') {
       this.props.focusPrevious()
-    } else if (e.key == 'ArrowDown') {
+    } else if (e.key === 'ArrowDown') {
       this.props.focusNext()
-    } else if (e.key == 'ArrowLeft') {
+    } else if (e.key === 'ArrowLeft') {
       this.changeButtonFocus(-1)
-    } else if (e.key == 'ArrowRight') {
+    } else if (e.key === 'ArrowRight') {
       this.changeButtonFocus(1)
-    } else if (e.key == 'Enter') {
+    } else if (e.key === 'Enter') {
       e.preventDefault()
       action()
     }
   }
 
+  setShowingOption = val => {
+    this.setState({ showingOption: val })
+  }
+
   render() {
+    const optionsItems = []
+
+    if (this.props.showResetButton) {
+      optionsItems.push({
+        label: 'Reload',
+        action: this.props.resetSession
+      })
+    }
+    if (this.props.showDownloadButton) {
+      optionsItems.push({
+        label: 'Download Conversation',
+        action: this.props.downloadConversation
+      })
+    }
+
+    if (this.props.showConversationsButton) {
+      optionsItems.push({
+        label: 'Toggle List View',
+        action: this.props.toggleConversations
+      })
+    }
+
+    if (this.props.showBotInfoButton) {
+      optionsItems.push({
+        label: 'Toggle Bot Info',
+        action: this.props.toggleBotInfo
+      })
+    }
+
+    if (this.props.isEmulator) {
+      return (
+        <div className="bpw-emulator-header">
+          <span className="bpw-emulator-header-tab">Emulator</span>
+          <MoreOptions show={this.state.showingOption} onToggle={this.setShowingOption} items={optionsItems} />
+        </div>
+      )
+    }
+
     return (
       <div className={'bpw-header-container'}>
         <div className={'bpw-header-title-flexbox'}>
@@ -232,7 +285,7 @@ export default inject(({ store }: { store: RootStore }) => ({
   botName: store.botName,
   botAvatarUrl: store.botAvatarUrl,
   hasBotInfoDescription: store.hasBotInfoDescription,
-
+  isEmulator: store.isEmulator,
   botConvoDescription: store.config.botConvoDescription,
   enableArrowNavigation: store.config.enableArrowNavigation
 }))(observer(Header))
@@ -246,6 +299,7 @@ type HeaderProps = Pick<
   | 'focusedArea'
   | 'isConversationsDisplayed'
   | 'botName'
+  | 'isEmulator'
   | 'hasUnreadMessages'
   | 'unreadCount'
   | 'hasBotInfoDescription'
