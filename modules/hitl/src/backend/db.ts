@@ -334,7 +334,7 @@ export default class HitlDb {
         this.from('hitl_messages')
           .where({ session_id: sessionId })
           .orderBy('ts', 'desc')
-          .limit(100)
+          .limit(1000)
           .select('*')
           .as('q1')
       })
