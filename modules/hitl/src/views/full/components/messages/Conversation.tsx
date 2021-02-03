@@ -43,17 +43,19 @@ export default class Conversation extends React.Component<Props> {
 
     const messages = await this.props.api.fetchSessionMessages(sessionId)
     this.setState({ loading: false, messages })
-
-    this.tryScrollToBottom()
   }
 
   appendMessage = (message: HitlMessage) => {
     if (!this.state.messages || message.session_id !== this.props.currentSessionId) {
       return
     }
+    const user = this.props.currentSession.user.attributes as any;
+    if (user.username) {
+      message.text = message.text.split(user.username).join('Zoe');
+      message.raw_message.text = message.raw_message.text.split(user.username).join('Zoe');
+    }
 
     this.setState({ messages: [...this.state.messages, message] })
-    this.tryScrollToBottom()
   }
 
   tryScrollToBottom(delayed?: boolean) {
