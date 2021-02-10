@@ -161,7 +161,7 @@ class RootStore {
     if (isBefore(start, this.currentConversation.typingUntil)) {
       start = this.currentConversation.typingUntil
     }
-    this.currentConversation.typingUntil = new Date(+start + Math.floor(event.timeInMs / 2))
+    this.currentConversation.typingUntil = new Date(+start + Math.floor(event.timeInMs))
     this._startTypingTimer()
   }
 
