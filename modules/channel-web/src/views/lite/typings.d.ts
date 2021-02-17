@@ -62,6 +62,7 @@ export namespace Renderer {
     escapeHTML: boolean
     intl?: any
     maxLength?: number
+    linkify?: boolean
   } & Message
 
   export type QuickReply = {

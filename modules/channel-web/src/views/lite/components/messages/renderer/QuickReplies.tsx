@@ -17,7 +17,7 @@ import { Button } from './Button'
 export class QuickReplies extends Component<Renderer.QuickReply> {
   handleButtonClicked = (title, payload) => {
     if (payload.startsWith('LINK:')) {
-      location.href = payload.substring('LINK:'.length).toLowerCase()
+      window.parent.location.href = payload.substring('LINK:'.length).toLowerCase()
     } else {
       // tslint:disable-next-line: no-floating-promises
       this.props.onSendData?.({
