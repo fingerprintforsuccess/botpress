@@ -21,6 +21,7 @@ interface State {
 class MessageList extends React.Component<MessageListProps, State> {
   private messagesDiv: HTMLElement
   private divSizeObserver: ResizeObserver
+  private lastHeight: number
   state: State = { showNewMessageIndicator: false, manualScroll: false }
 
   componentDidMount() {
@@ -38,7 +39,7 @@ class MessageList extends React.Component<MessageListProps, State> {
           }
           return
         }
-        this.tryScrollToBottom()
+        this.tryScrollToBottom(true)
       })
     }
 
@@ -49,7 +50,7 @@ class MessageList extends React.Component<MessageListProps, State> {
         }
         return
       }
-      this.tryScrollToBottom()
+      this.tryScrollToBottom(true)
     })
 
     // this should account for keyboard rendering as it triggers a resize of the messagesDiv
@@ -74,7 +75,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     setTimeout(
       () => {
         try {
-          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight
+          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
         } catch (err) {
           // Discard the error
         }
