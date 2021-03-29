@@ -2,6 +2,7 @@ import { BotDetails, Flow, FlowNode, IO, RolloutStrategy, StageRequestApprovers,
 import { Request } from 'express'
 
 import { BotpressConfig } from '../core/config/botpress.config'
+import { LicenseInfo, LicenseStatus } from './licensing-service'
 
 export interface IDisposeOnExit {
   disposeOnExit(): void
@@ -61,7 +62,9 @@ export interface AuthRole {
 export interface TokenUser {
   email: string
   strategy: string
+  tokenVersion: number
   isSuperAdmin: boolean
+  csrfToken?: string
   exp?: number
   iat?: number
 }
@@ -70,6 +73,12 @@ export interface StoredToken {
   token: string
   expiresAt: number
   issuedAt: number
+}
+
+export interface TokenResponse {
+  jwt: string
+  csrf: string
+  exp: number
 }
 
 export type RequestWithUser = Request & {
@@ -108,7 +117,7 @@ export interface Stage {
 
 export interface UserProfile {
   email: string
-  isSuperAdmin?: boolean
+  isSuperAdmin: boolean
   strategyType: string
   strategy: string
   firstname?: string
@@ -254,3 +263,12 @@ export interface ActionParameterDefinition {
 export type ActionServerWithActions = ActionServer & {
   actions: ActionDefinition[] | undefined
 }
+
+export type LicensingStatus = {
+  isPro: boolean
+  isBuiltWithPro: boolean
+  fingerprints: {
+    cluster_url: string
+  }
+  license?: LicenseInfo
+} & LicenseStatus

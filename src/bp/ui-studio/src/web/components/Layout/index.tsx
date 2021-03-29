@@ -1,11 +1,12 @@
 import { NLU } from 'botpress/sdk'
 import { lang, utils } from 'botpress/shared'
+import cx from 'classnames'
 import React, { FC, Fragment, useEffect, useRef, useState } from 'react'
 import { HotKeys } from 'react-hotkeys'
 import { connect } from 'react-redux'
 import { Redirect, Route, Switch } from 'react-router-dom'
 import SplitPane from 'react-split-pane'
-import { setEmulatorOpen, toggleBottomPanel, trainSessionReceived, viewModeChanged } from '~/actions'
+import { setEmulatorOpen, toggleBottomPanel, toggleInspector, trainSessionReceived, viewModeChanged } from '~/actions'
 import SelectContentManager from '~/components/Content/Select/Manager'
 import PluginInjectionSite from '~/components/PluginInjectionSite'
 import storage from '~/util/storage'
@@ -15,7 +16,6 @@ import FlowBuilder from '~/views/FlowBuilder'
 import Logs from '~/views/Logs'
 import Module from '~/views/Module'
 
-import { TrainingStatusService } from './training-status-service'
 import BottomPanel from './BottomPanel'
 import BotUmountedWarning from './BotUnmountedWarning'
 import CommandPalette from './CommandPalette'
@@ -25,6 +25,7 @@ import layout from './Layout.scss'
 import Sidebar from './Sidebar'
 import StatusBar from './StatusBar'
 import Toolbar from './Toolbar'
+import { TrainingStatusService } from './training-status-service'
 
 const { isInputFocused } = utils
 const WEBCHAT_PANEL_STATUS = 'bp::webchatOpened'
@@ -57,6 +58,9 @@ const Layout: FC<Props> = (props: Props) => {
     setTimeout(() => BotUmountedWarning(), 500)
 
     const handleWebChatPanel = message => {
+      if (message.data.chatId) {
+        return // event is not coming from emulator
+      }
       if (message.data.name === 'webchatLoaded' && storage.get(WEBCHAT_PANEL_STATUS) === 'opened') {
         toggleEmulator()
       }
@@ -80,7 +84,7 @@ const Layout: FC<Props> = (props: Props) => {
 
   useEffect(() => {
     const trainStatusService = new TrainingStatusService(props.contentLang, props.trainSessionReceived)
-    // tslint:disable-next-line: no-floating-promises
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     trainStatusService.fetchTrainingStatus()
     trainStatusService.listen()
     return () => trainStatusService.stopListening()
@@ -174,7 +178,8 @@ const Layout: FC<Props> = (props: Props) => {
     'go-module-qna': () => gotoUrl('/modules/qna'),
     'go-module-testing': () => gotoUrl('/modules/testing'),
     'go-module-analytics': () => gotoUrl('/modules/analytics'),
-    'go-understanding': () => gotoUrl('/modules/nlu')
+    'go-understanding': () => gotoUrl('/modules/nlu'),
+    'toggle-inspect': props.toggleInspector
   }
 
   const splitPanelLastSizeKey = `bp::${window.BOT_ID}::bottom-panel-size`
@@ -199,7 +204,9 @@ const Layout: FC<Props> = (props: Props) => {
             onChange={size => size > 100 && localStorage.setItem(splitPanelLastSizeKey, size.toString())}
             size={bottomBarSize}
             maxSize={-100}
-            className={layout.mainSplitPaneWToolbar}
+            className={cx(layout.mainSplitPaneWToolbar, {
+              'emulator-open': props.emulatorOpen
+            })}
           >
             <main ref={mainElRef} className={layout.main} id="main" tabIndex={9999}>
               <Switch>
@@ -244,9 +251,16 @@ const mapStateToProps = state => ({
   bottomPanel: state.ui.bottomPanel,
   bottomPanelExpanded: state.ui.bottomPanelExpanded,
   translations: state.language.translations,
-  contentLang: state.language.contentLang
+  contentLang: state.language.contentLang,
+  emulatorOpen: state.ui.emulatorOpen
 })
 
-const mapDispatchToProps = { viewModeChanged, toggleBottomPanel, setEmulatorOpen, trainSessionReceived }
+const mapDispatchToProps = {
+  viewModeChanged,
+  toggleBottomPanel,
+  setEmulatorOpen,
+  trainSessionReceived,
+  toggleInspector
+}
 
 export default connect(mapStateToProps, mapDispatchToProps)(Layout)

@@ -58,7 +58,7 @@ const processErrors = (event: sdk.IO.IncomingEvent, getNode: (flow: string, node
     .filter(x => x.errors?.length)
     .forEach(({ errors }) => {
       errors.forEach(error => {
-        console.log(error)
+        console.error(error)
         if (error.flowName && error.nodeName) {
           getNode(error.flowName, error.nodeName).hasError = true
         }

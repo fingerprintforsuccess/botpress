@@ -1,6 +1,6 @@
 import { Intent, Menu, MenuDivider, MenuItem } from '@blueprintjs/core'
 import { DecisionTriggerCondition, Flow, FormData } from 'botpress/sdk'
-import { contextMenu, lang, sharedStyle, ShortcutLabel, toast } from 'botpress/shared'
+import { contextMenu, lang, sharedStyle, ShortcutLabel, toast, utils } from 'botpress/shared'
 import { FlowView } from 'common/typings'
 import React, { FC } from 'react'
 import { AbstractNodeFactory, DiagramEngine } from 'storm-react-diagrams'
@@ -10,9 +10,9 @@ import { StandardPortWidget } from '~/views/FlowBuilder/diagram/nodes/Ports'
 import { NodeDebugInfo } from '../../debugger'
 import { defaultTransition } from '../../manager'
 import ActionContents from '../ActionContents'
-import style from '../Components/style.scss'
 import NodeHeader from '../Components/NodeHeader'
 import NodeWrapper from '../Components/NodeWrapper'
+import style from '../Components/style.scss'
 import ExecuteContents from '../ExecuteContents'
 import RouterContents from '../RouterContents'
 import SaySomethingContents from '../SaySomethingContents'
@@ -204,7 +204,11 @@ const BlockWidget: FC<BlockProps> = ({
   }
 
   return (
-    <NodeWrapper isHighlighed={node.isHighlighted || node.isSelected()} isLarge={isOldNode}>
+    <NodeWrapper
+      isHighlighed={node.isHighlighted || node.isSelected()}
+      isLarge={isOldNode}
+      onClick={() => utils.inspect(getCurrentFlow().nodes.find(x => x.id === node.id))}
+    >
       <NodeHeader
         className={style[nodeType]}
         setExpanded={canCollapse && handleExpanded}

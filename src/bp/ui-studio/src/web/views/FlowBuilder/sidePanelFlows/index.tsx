@@ -11,9 +11,8 @@ import { getAllFlows, getCurrentFlow, getDirtyFlows, getFlowNamesList } from '~/
 
 import Inspector from '../inspector'
 
-import FlowsList from './FlowsList'
 import FlowNameModal from './FlowNameModal'
-import Toolbar from './Toolbar'
+import FlowsList from './FlowsList'
 
 export type PanelPermissions = 'create' | 'rename' | 'delete'
 
@@ -70,33 +69,25 @@ const SidePanelContent: FC<Props> = props => {
 
   return (
     <SidePanel>
-      <Toolbar mutexInfo={props.mutexInfo} />
-
-      {props.showFlowNodeProps ? (
-        <Inspector />
-      ) : (
-        <React.Fragment>
-          <SidePanelSection
-            label={lang.tr('flows')}
-            actions={props.permissions.includes('create') && [createFlowAction]}
-          >
-            <SearchBar icon="filter" placeholder={lang.tr('studio.flow.sidePanel.filterFlows')} onChange={setFilter} />
-            <FlowsList
-              readOnly={props.readOnly}
-              canDelete={props.permissions.includes('delete')}
-              canRename={props.permissions.includes('rename')}
-              flows={flowsName}
-              dirtyFlows={props.dirtyFlows}
-              goToFlow={goToFlow}
-              deleteFlow={props.deleteFlow}
-              duplicateFlow={duplicateFlow}
-              renameFlow={renameFlow}
-              currentFlow={props.currentFlow}
-              filter={filter}
-            />
-          </SidePanelSection>
-        </React.Fragment>
-      )}
+      <SidePanelSection
+        label={lang.tr('flows')}
+        actions={props.permissions.includes('create') && [createFlowAction]}
+      >
+        <SearchBar icon="filter" placeholder={lang.tr('studio.flow.sidePanel.filterFlows')} onChange={setFilter} />
+        <FlowsList
+          readOnly={props.readOnly}
+          canDelete={props.permissions.includes('delete')}
+          canRename={props.permissions.includes('rename')}
+          flows={flowsName}
+          dirtyFlows={props.dirtyFlows}
+          goToFlow={goToFlow}
+          deleteFlow={props.deleteFlow}
+          duplicateFlow={duplicateFlow}
+          renameFlow={renameFlow}
+          currentFlow={props.currentFlow}
+          filter={filter}
+        />
+      </SidePanelSection>
       <FlowNameModal
         action={flowAction}
         originalName={flowName}
@@ -107,6 +98,21 @@ const SidePanelContent: FC<Props> = props => {
         onRenameFlow={props.renameFlow}
         onDuplicateFlow={props.duplicateFlow}
       />
+    </SidePanel>
+  )
+}
+
+const SidePanelInspectorContent: FC<Props> = props => {
+  return (
+    <SidePanel style={{
+      position: 'absolute',
+      right: 0,
+      width: 240,
+      zIndex: 1,
+      paddingTop: 70,
+      ...(!props.showFlowNodeProps && { width: 0 })
+    }}>
+      {props.showFlowNodeProps ? ( <Inspector /> ) : null}
     </SidePanel>
   )
 }
@@ -126,4 +132,7 @@ const mapDispatchToProps = {
   renameFlow
 }
 
+const SidePanelInspector = connect(mapStateToProps, mapDispatchToProps)(SidePanelInspectorContent)
+
 export default connect(mapStateToProps, mapDispatchToProps)(SidePanelContent)
+export { SidePanelInspector }

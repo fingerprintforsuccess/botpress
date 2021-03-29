@@ -123,7 +123,8 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   renderAvatar(name, url) {
-    return <Avatar name={name} avatarUrl={url} height={40} width={40} />
+    const avatarSize = this.props.isEmulator ? 20 : 40 // quick fix
+    return <Avatar name={name} avatarUrl={url} height={avatarSize} width={avatarSize} />
   }
 
   renderMessageGroups() {
@@ -244,6 +245,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
 export default inject(({ store }: { store: RootStore }) => ({
   intl: store.intl,
+  isEmulator: store.isEmulator,
   botName: store.botName,
   isBotTyping: store.isBotTyping,
   botAvatarUrl: store.botAvatarUrl,
@@ -264,6 +266,7 @@ type MessageListProps = InjectedIntlProps &
     | 'focusPrevious'
     | 'focusNext'
     | 'botAvatarUrl'
+    | 'isEmulator'
     | 'botName'
     | 'enableArrowNavigation'
     | 'showUserAvatar'
