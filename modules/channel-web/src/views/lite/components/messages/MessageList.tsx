@@ -39,6 +39,7 @@ class MessageList extends React.Component<MessageListProps, State> {
           }
           return
         }
+        this.tryScrollToBottom()
         this.tryScrollToBottom(true)
       })
     }
@@ -50,6 +51,7 @@ class MessageList extends React.Component<MessageListProps, State> {
         }
         return
       }
+      this.tryScrollToBottom()
       this.tryScrollToBottom(true)
     })
 
