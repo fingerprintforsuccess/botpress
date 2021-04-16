@@ -335,10 +335,8 @@ export default class HitlDb {
       .join('srv_channel_users', knex.raw('srv_channel_users.user_id'), 'hitl_sessions.userId')
       .where({ 'hitl_sessions.id': sessionId })
       .first()
-    
-    let q = this.knex
 
-    return this.knex
+    let q = this.knex
       .orderBy('ts', 'asc')
       .select('*')
       .from(function() {
@@ -349,20 +347,21 @@ export default class HitlDb {
           .select('*')
           .as('q1')
       })
-    
+
     return q.then(messages => messages.map((msg) => this.anonymizeMessage(user.attributes, msg)))
   }
 
   anonymizeMessage(user, message) {
-     let processed = { ...message }
-     
-     let sub = 'Zoe';
-     if (user.gender === 'male') sub = 'John';
-     else if (user.gender === 'female') sub = 'Jane';
-     
+     const processed = { ...message }
+     const sub = 'Zoe'
+
      if (user.userName) {
-       if (processed.text) processed.text = processed.text.split(user.userName).join(sub);
-       if (processed.raw_message.text) processed.raw_message.text = processed.raw_message.text.split(user.userName).join(sub);
+       if (processed.text) {
+         processed.text = processed.text.split(user.userName).join(sub);
+       }
+       if (processed.raw_message.text) {
+         processed.raw_message.text = processed.raw_message.text.split(user.userName).join(sub);
+       }
      }
      return processed
   }
