@@ -21,6 +21,7 @@ interface State {
 class MessageList extends React.Component<MessageListProps, State> {
   private messagesDiv: HTMLElement
   private divSizeObserver: ResizeObserver
+  private lastHeight: number
   state: State = { showNewMessageIndicator: false, manualScroll: false }
 
   componentDidMount() {
@@ -39,8 +40,20 @@ class MessageList extends React.Component<MessageListProps, State> {
           return
         }
         this.tryScrollToBottom()
+        this.tryScrollToBottom(true)
       })
     }
+
+    observe(this.props.isBotTyping, v => {
+      if (this.state.manualScroll) {
+        if (!this.state.showNewMessageIndicator) {
+          this.setState({ showNewMessageIndicator: true })
+        }
+        return
+      }
+      this.tryScrollToBottom()
+      this.tryScrollToBottom(true)
+    })
 
     // this should account for keyboard rendering as it triggers a resize of the messagesDiv
     this.divSizeObserver = new ResizeObserver(
@@ -64,7 +77,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     setTimeout(
       () => {
         try {
-          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight
+          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
         } catch (err) {
           // Discard the error
         }
@@ -95,6 +108,7 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   renderDate(date) {
+    return null;
     return (
       <div className={'bpw-date-container'}>
         {this.props.intl.formatTime(new Date(date), {
@@ -111,7 +125,8 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   renderAvatar(name, url) {
-    return <Avatar name={name} avatarUrl={url} height={40} width={40} />
+    const avatarSize = this.props.isEmulator ? 20 : 40 // quick fix
+    return <Avatar name={name} avatarUrl={url} height={avatarSize} width={avatarSize} />
   }
 
   renderMessageGroups() {
@@ -145,7 +160,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     })
 
     if (this.props.isBotTyping.get()) {
-      if (lastSpeaker !== 'bot') {
+      if (lastSpeaker?.toLowerCase() !== 'bot') {
         currentGroup = []
         groups.push(currentGroup)
       }
@@ -183,6 +198,7 @@ class MessageList extends React.Component<MessageListProps, State> {
                 key={`msg-group-${i}`}
                 isLastGroup={i >= groups.length - 1}
                 messages={group}
+                onLoad={this.tryScrollToBottom}
               />
             </div>
           )
@@ -231,6 +247,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
 export default inject(({ store }: { store: RootStore }) => ({
   intl: store.intl,
+  isEmulator: store.isEmulator,
   botName: store.botName,
   isBotTyping: store.isBotTyping,
   botAvatarUrl: store.botAvatarUrl,
@@ -251,6 +268,7 @@ type MessageListProps = InjectedIntlProps &
     | 'focusPrevious'
     | 'focusNext'
     | 'botAvatarUrl'
+    | 'isEmulator'
     | 'botName'
     | 'enableArrowNavigation'
     | 'showUserAvatar'

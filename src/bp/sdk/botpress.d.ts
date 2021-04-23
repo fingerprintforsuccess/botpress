@@ -37,6 +37,7 @@ declare module 'botpress/sdk' {
     id?: number
     password?: string
     salt?: string
+    tokenVersion: number
   } & UserInfo
 
   export interface UserInfo {
@@ -432,77 +433,6 @@ declare module 'botpress/sdk' {
   }
 
   export namespace NLU {
-    export namespace errors {
-      export const isTrainingCanceled: (err: Error) => boolean
-      export const isTrainingAlreadyStarted: (err: Error) => boolean
-    }
-
-    export const makeEngine: (config: Config, logger: Logger) => Promise<Engine>
-
-    export interface Engine {
-      getHealth: () => Health
-      getLanguages: () => string[]
-      computeModelHash(intents: NLU.IntentDefinition[], entities: NLU.EntityDefinition[], lang: string): string
-      loadModel: (model: Model, modelId: string) => Promise<void>
-      hasModel: (modelId: string) => boolean
-      train: (
-        trainSessionId: string,
-        intentDefs: NLU.IntentDefinition[],
-        entityDefs: NLU.EntityDefinition[],
-        languageCode: string,
-        options: TrainingOptions
-      ) => Promise<Model>
-      cancelTraining: (trainSessionId: string) => Promise<void>
-      detectLanguage: (text: string, modelByLang: Dic<string>) => Promise<string>
-      predict: (text: string, ctx: string[], modelId: string) => Promise<IO.EventUnderstanding>
-      spellCheck(sentence: string, modelId: string): Promise<string>
-    }
-
-    export interface Config extends LanguageConfig {
-      modelCacheSize: number
-    }
-
-    export interface LanguageConfig {
-      ducklingURL: string
-      ducklingEnabled: boolean
-      languageSources: LanguageSource[]
-    }
-
-    export interface LanguageSource {
-      endpoint: string
-      authToken?: string
-    }
-
-    export interface Logger {
-      info: (msg: string) => void
-      warning: (msg: string, err?: Error) => void
-      error: (msg: string, err?: Error) => void
-    }
-
-    export interface TrainingOptions {
-      nluSeed: number
-      progressCallback: (x: number) => void
-      previousModel?: string
-    }
-
-    export interface Model {
-      hash: string
-      languageCode: string
-      seed: number
-      startedAt: Date
-      finishedAt: Date
-      data: {
-        input: string
-        output: string
-      }
-    }
-
-    export interface Health {
-      isEnabled: boolean
-      validProvidersCount: number
-      validLanguages: string[]
-    }
-
     /**
      * idle : occures when there are no training sessions for a bot
      * done : when a training is complete
@@ -527,7 +457,6 @@ declare module 'botpress/sdk' {
       status: TrainingStatus
       language: string
       progress: number
-      lock?: RedisLock
     }
 
     export type EntityType = 'system' | 'pattern' | 'list'
@@ -550,6 +479,7 @@ declare module 'botpress/sdk' {
     }
 
     export interface SlotDefinition {
+      id: string
       name: string
       entities: string[]
       color: number
@@ -560,7 +490,6 @@ declare module 'botpress/sdk' {
       utterances: {
         [lang: string]: string[]
       }
-      filename: string
       slots: SlotDefinition[]
       contexts: string[]
     }
@@ -569,7 +498,6 @@ declare module 'botpress/sdk' {
       name: string
       confidence: number
       context: string
-      matches?: (intentPattern: string) => boolean
     }
 
     export interface Entity {
@@ -606,19 +534,6 @@ declare module 'botpress/sdk' {
     }
 
     export type SlotCollection = Dic<Slot>
-
-    export interface Predictions {
-      [context: string]: {
-        confidence: number
-        oos: number
-        intents: {
-          label: string
-          confidence: number
-          slots: SlotCollection
-          extractor: 'exact-matcher' | 'classifier'
-        }[]
-      }
-    }
   }
 
   export namespace NDU {
@@ -701,6 +616,7 @@ declare module 'botpress/sdk' {
       credentials?: any
       nlu?: Partial<EventUnderstanding>
       incomingEventId?: string
+      debugger?: boolean
     }
 
     /**
@@ -766,20 +682,38 @@ declare module 'botpress/sdk' {
     }
 
     export interface EventUnderstanding {
-      intent?: NLU.Intent
-      /** Predicted intents needs disambiguation */
-      readonly ambiguous?: boolean
-      intents?: NLU.Intent[]
-      /** The language used for prediction. Will be equal to detected language when its part of supported languages, falls back to default language otherwise */
-      readonly language: string
-      /** Language detected from users input. */
-      readonly detectedLanguage?: string
-      readonly spellChecked?: string
-      readonly entities: NLU.Entity[]
-      readonly slots?: NLU.SlotCollection
       readonly errored: boolean
+
+      readonly predictions?: {
+        [context: string]: {
+          confidence: number
+          oos: number
+          intents: {
+            label: string
+            confidence: number
+            slots: NLU.SlotCollection
+            extractor: string
+          }[]
+        }
+      }
+
+      // election
+      readonly entities?: NLU.Entity[]
+      readonly intent?: NLU.Intent
+      readonly intents?: NLU.Intent[]
+      readonly ambiguous?: boolean /** Predicted intents needs disambiguation */
+      readonly slots?: NLU.SlotCollection
+
+      // pre-prediction
+      readonly detectedLanguage:
+        | string
+        | undefined /** Language detected from users input. If undefined, detection failed. */
+      readonly spellChecked:
+        | string
+        | undefined /** Result of spell checking on users input. If undefined, spell check failed. */
+
+      readonly language: string /** The language used for prediction */
       readonly includedContexts: string[]
-      readonly predictions?: NLU.Predictions
       readonly ms: number
     }
 
@@ -1139,13 +1073,19 @@ declare module 'botpress/sdk' {
       contentTypes: string[]
     }
     converse?: ConverseConfig
-    dialog?: DialogConfig
-    logs?: LogsConfig
+    dialog?: BotDialogConfig
+    logs?: BotLogsConfig
     defaultLanguage: string
     languages: string[]
     locked: boolean
     pipeline_status: BotPipelineStatus
     oneflow?: boolean
+
+    /**
+     * constant number used to seed nlu random number generators
+     * if not set, seed is computed from botId
+     */
+    nluSeed?: number
   }
 
   export type Pipeline = Stage[]
@@ -1190,14 +1130,14 @@ declare module 'botpress/sdk' {
     coverPictureUrl?: string
   }
 
-  export interface LogsConfig {
+  export interface BotLogsConfig {
     expiration: string
   }
 
   /**
    * Configuration definition of Dialog Sessions
    */
-  export interface DialogConfig {
+  export interface BotDialogConfig {
     /** The interval until a session context expires */
     timeoutInterval: string
     /** The interval until a session expires */
@@ -1585,12 +1525,16 @@ declare module 'botpress/sdk' {
      */
     baseURL: string
     headers: {
-      Authorization: string
+      'CSRF-Token'?: string
+      Authorization?: string
+      'X-BP-Workspace'?: string
     }
   }
 
   export interface MigrationResult {
     success: boolean
+    /** Indicates if the migration had to be executed  */
+    hasChanges?: boolean
     message?: string
   }
 
@@ -1666,6 +1610,14 @@ declare module 'botpress/sdk' {
     includeSuperAdmins: boolean
   }
 
+  export interface WorkspaceUser {
+    email: string
+    strategy: string
+    role: string
+    workspace: string
+    workspaceName?: string
+  }
+
   export interface AddWorkspaceUserOptions {
     /** Select an existing custom role for that user. If role, asAdmin and asChatUser are undefined, then it will pick the default role */
     role?: string
@@ -1673,6 +1625,127 @@ declare module 'botpress/sdk' {
     asAdmin?: boolean
     /** When enabled, user is added as a chat user (role is ignored)  */
     asChatUser?: boolean
+  }
+
+  export type uuid = string
+
+  export interface ListOptions {
+    limit?: number
+    offset?: number
+  }
+
+  export interface Conversation {
+    id: uuid
+    userId: string
+    botId: string
+    createdOn: Date
+  }
+
+  export interface RecentConversation extends Conversation {
+    lastMessage?: Message
+  }
+
+  export interface ConversationDeleteFilters {
+    id?: uuid
+    userId?: string
+  }
+
+  export interface ConversationListFilters extends ListOptions {
+    userId: string
+  }
+
+  export interface Message {
+    id: uuid
+    conversationId: uuid
+    eventId?: string
+    incomingEventId?: string
+    from: string
+    sentOn: Date
+    payload: any
+  }
+
+  export interface MessageArgs
+    extends Partial<Omit<IO.EventCtorArgs, 'type' | 'direction' | 'payload' | 'target' | 'botId' | 'threadId'>> {}
+
+  export interface MessageDeleteFilters {
+    id?: uuid
+    conversationId?: uuid
+  }
+
+  export interface MessageListFilters extends ListOptions {
+    conversationId: uuid
+  }
+
+  export interface RenderPipeline {
+    text: typeof experimental.render.text
+    image: typeof experimental.render.image
+    card: typeof experimental.render.card
+    carousel: typeof experimental.render.carousel
+    choice: typeof experimental.render.choice
+    buttonSay: typeof experimental.render.buttonSay
+    buttonUrl: typeof experimental.render.buttonUrl
+    buttonPostback: typeof experimental.render.buttonPostback
+    option: typeof experimental.render.option
+  }
+
+  export interface Content {
+    type: string
+  }
+
+  export interface TextContent extends Content {
+    type: 'text'
+    text: string | MultiLangText
+    markdown?: boolean
+  }
+
+  export interface ImageContent extends Content {
+    type: 'image'
+    image: string
+    title?: string | MultiLangText
+  }
+
+  export interface CarouselContent extends Content {
+    type: 'carousel'
+    items: CardContent[]
+  }
+
+  export interface CardContent extends Content {
+    type: 'card'
+    title: string | MultiLangText
+    subtitle?: string | MultiLangText
+    image?: string
+    actions: ActionButton[]
+  }
+
+  export interface ActionButton {
+    title: string
+    action: string
+  }
+
+  export interface ActionSaySomething extends ActionButton {
+    action: 'Say something'
+    text: string | MultiLangText
+  }
+
+  export interface ActionOpenURL extends ActionButton {
+    action: 'Open URL'
+    url: string
+  }
+
+  export interface ActionPostback extends ActionButton {
+    action: 'Postback'
+    payload: string
+  }
+
+  export interface ChoiceContent extends Content {
+    type: 'single-choice'
+    message: string | MultiLangText
+    choices: ChoiceOption[]
+  }
+
+  export interface ChoiceOption {
+    message: string | MultiLangText
+    value: string
   }
 
   ////////////////
@@ -1688,6 +1761,11 @@ declare module 'botpress/sdk' {
      * @param payload The payload to send
      */
     export function sendPayload(payload: RealTimePayload)
+    /**
+     * Returns the corresponding the roomId in the /guest socket io namespace
+     * @param socketId id generated by socket.io
+     */
+    export function getVisitorIdFromGuestSocketId(socketId: string): Promise<undefined | string>
   }
 
   // prettier-ignore
@@ -1883,7 +1961,7 @@ declare module 'botpress/sdk' {
      * from the user waiting in the queue.
      * @param event - Current event in the action context, used to identify the queue
      */
-    export function isIncomingQueueEmpty(event: IO.Event): boolean
+    export function isIncomingQueueEmpty(event: IO.IncomingEvent): boolean
 
     /**
      * When Event Storage is enabled, you can use this API to query data about stored events. You can use multiple fields
@@ -1935,11 +2013,13 @@ declare module 'botpress/sdk' {
 
     /**
      * Merge the specified attributes to the existing attributes of the user
+     * @deprecated Please mutate `event.state.user` directly instead
      */
     export function updateAttributes(channel: string, userId: string, attributes: any): Promise<void>
 
     /**
      * Overwrite all the attributes of the user with the specified payload
+     * @deprecated Please mutate `event.state.user` directly instead
      */
     export function setAttributes(channel: string, userId: string, attributes: any): Promise<void>
     export function getAllUsers(paging?: Paging): Promise<any>
@@ -1970,8 +2050,9 @@ declare module 'botpress/sdk' {
     /**
      * Deletes a session
      * @param sessionId The Id of the session to delete
+     * @param botId The Id of the bot to which the session is tied
      */
-    export function deleteSession(sessionId: string): Promise<void>
+    export function deleteSession(sessionId: string, botId: string): Promise<void>
 
     /**
      * Jumps to a specific flow and optionally a specific node. This is useful when the default flow behavior needs to be bypassed.
@@ -2300,5 +2381,271 @@ declare module 'botpress/sdk' {
   export namespace experimental {
     export function disableHook(hookName: string, hookType: string, moduleName?: string): Promise<boolean>
     export function enableHook(hookName: string, hookType: string, moduleName?: string): Promise<boolean>
+
+    export namespace conversations {
+      export function forBot(botId: string): BotConversations
+
+      export interface BotConversations {
+        /**
+         * Create a conversation to store in the db
+         * @param userId Id of the user to create a conversation with
+         * @returns The created conversation
+         * @example
+         * const conversation = await bp.conversations.forBot('myBot').create('eEFoneif394')
+         */
+        create(userId: uuid): Promise<Conversation>
+
+        /**
+         * Deletes conversations from the db
+         * @param filters Filters which conversations to delete
+         * @returns The number of deleted rows
+         * @example
+         * // Delete a conversation by id
+         * await bp.conversations.forBot('myBot').delete({ id: '9aa7da7a-9ab1-4a60-bedd-8bdca22beb03' })
+         * // Delete all conversations of a bot user
+         * await bp.conversations.forBot('myBot').delete({ userId: 'eEFoneif394' })
+         */
+        delete(filters: ConversationDeleteFilters): Promise<number>
+
+        /**
+         * Gets one conversation from the db
+         * @param id Id of the conversation to get
+         * @returns The matching conversation or `undefined` if none were found
+         * @example
+         * // Get conversation by id
+         * const converation = await bp.conversations.forBot('myBot').get('9aa7da7a-9ab1-4a60-bedd-8bdca22beb03'})
+         */
+        get(id: uuid): Promise<Conversation | undefined>
+
+        /**
+         * Gets many conversations from the db.
+         * The results are ordered from most recent to least recent
+         * @param filters Filters which conversations to get
+         * @example
+         * // Get the 20 most recent conversations of a bot user
+         * const conversations = await bp.conversations.forBot('myBot').list({ userId: 'eEFoneif394', limit: 20 })
+         */
+        list(filters: ConversationListFilters): Promise<RecentConversation[]>
+
+        /**
+         * Gets the most recent conversation of a user.
+         * If the user has no matching conversation, creates one
+         * @param userId Id of the user
+         * @example
+         * const conversation = await bp.conversations.forBot('myBot').recent('eEFoneif394')
+         */
+        recent(userId: uuid): Promise<Conversation>
+      }
+    }
+
+    export namespace messages {
+      export function forBot(botId: string): BotMessages
+
+      export interface BotMessages {
+        /**
+         * Sends a outgoing message (bot message) through the event loop. The message is stored in the database
+         * @param conversationId Id of the conversation to which this message belongs to
+         * @param payload Payload of the message
+         * @param args Additional arguments to pass to the event constructor. Optional
+         * @example
+         * // Inside an action
+         * await bp.messages
+         *   .forBot(event.botId)
+         *   .send(event.threadId, { type: 'text', text: 'hello user!' })
+         */
+        send(conversationId: uuid, payload: any, args?: MessageArgs): Promise<Message>
+
+        /**
+         * Sends a incoming message (user message) through the event loop. The message is stored in the database
+         * @param conversationId Id of the conversation to which this message belongs to
+         * @param payload Payload of the message
+         * @param args Additional arguments to pass to the event constructor. Optional
+         * @example
+         * // Inside an action
+         * await bp.messages
+         *   .forBot(event.botId)
+         *   .receive(event.threadId, { type: 'text', text: 'this is a message from the user!' })
+         */
+        receive(conversationId: uuid, payload: any, args?: MessageArgs): Promise<Message>
+
+        /**
+         * Creates a message to store in the db
+         * @param args Properties of the message
+         * @returns The created message
+         * @example
+         * const message = await bp.messages
+         *   .forBot('myBot')
+         *   .create('9aa7da7a-9ab1-4a60-bedd-8bdca22beb03', { type: 'text', text: 'hello' }, 'user', '32242', '242224')
+         */
+        create(
+          conversationId: uuid,
+          payload: any,
+          from: string,
+          eventId?: string,
+          incomingEventId?: string
+        ): Promise<Message>
+
+        /**
+         * Deletes messages from the db
+         * @param filters Filters which messages to delete
+         * @returns The number of deleted rows
+         * @example
+         * // Delete message by id
+         * await bp.messages.forBot('myBot').delete({ id: '00001337-ca79-4235-8475-3785e41eb2be' })
+         * @example
+         * // Delete all messages of a conversation
+         * await bp.messages.forBot('myBot').delete({ conversationId: '9aa7da7a-9ab1-4a60-bedd-8bdca22beb03' })
+         */
+        delete(filters: MessageDeleteFilters): Promise<number>
+
+        /**
+         * Gets one message from the db
+         * @param id Id of the message to get
+         * @returns The matching message or `undefined` if none were found
+         * @example
+         * // Get message by id
+         * const message = await bp.message.forBot('myBot').get('00001337-ca79-4235-8475-3785e41eb2be')
+         */
+        get(id: uuid): Promise<Message | undefined>
+
+        /**
+         * Gets many messages from the db.
+         * The results are ordered from most recent to least recent
+         * @param filters Filters which messages to get
+         * @example
+         * // Get 20 most recent messages of a conversation
+         * const messages = await bp.messages.forBot('myBot').list({ conversationId: '9aa7da7a-9ab1-4a60-bedd-8bdca22beb03', limit: 20 })
+         */
+        list(filters: MessageListFilters): Promise<Message[]>
+      }
+    }
+
+    /**
+     * WARNING : these payloads do not produce typing indicators yet!
+     */
+    export namespace render {
+      /**
+       * Renders a text element
+       * @param text Text to show
+       * @param markdown Indicates whether to use markdown
+       */
+      export function text(text: string | MultiLangText, markdown?: boolean): TextContent
+
+      /**
+       * Renders an image element
+       * @param url Url of the image to send
+       * @param caption Caption to appear alongside your image
+       */
+      export function image(url: string, caption?: string | MultiLangText): ImageContent
+
+      /**
+       * Renders a carousel element
+       * @param cards The cards of the carousel
+       * @example
+       * bp.render.carousel(bp.render.card('my card'), bp.render.card('my card 2'))
+       */
+      export function carousel(...cards: CardContent[]): CarouselContent
+
+      /**
+       * Renders a card element
+       * @param title The title of your card
+       * @param image The url of a pictured shown in your card
+       * @param subtitle A subtitle below your image
+       * @param buttons Action buttons for your card
+       * @example
+       * bp.render.card('my card', 'https://mysite.com/mypicture.png', 'an interesting subtitle', bp.render.buttonSay('hello'))
+       */
+      export function card(
+        title: string | MultiLangText,
+        image?: string,
+        subtitle?: string | MultiLangText,
+        ...buttons: ActionButton[]
+      ): CardContent
+
+      /**
+       * Renders an action button used to send a message to the conversation
+       * @param title Title shown on the button
+       * @param text Message to send
+       */
+      export function buttonSay(title: string, text: string | MultiLangText): ActionSaySomething
+
+      /**
+       * Renders an action button for opening urls
+       * @param title Title shown on the button
+       * @param text Url to open
+       */
+      export function buttonUrl(title: string, url: string): ActionOpenURL
+
+      /**
+       * Renders an action button for posting content
+       * @param title Title shown on the button
+       * @param payload Payload to post
+       */
+      export function buttonPostback(title: string, payload: string): ActionPostback
+
+      /**
+       * Render a choice element
+       * @param message Message to ask to the user
+       * @param choices Choices that the user can select
+       * @example
+       * bp.render.choice("Yes or no?", bp.render.option('yes'), bp.render.option('no'))
+       */
+      export function choice(message: string | MultiLangText, ...choices: ChoiceOption[]): ChoiceContent
+
+      /**
+       * Renders an option for a choice element
+       * @param value Value associated with the option
+       * @param message Text to shown to the user (has no impact on the processing).
+       * If not provided the value will be shown by default
+       */
+      export function option(value: string, message?: string): ChoiceOption
+
+      /**
+       * Translates a content element to a specific language
+       * @param content Content element to be translated
+       * @param lang Language code in which to translate (en, fr, es, etc.)
+       * @example
+       * const content = bp.render.text({ en: 'hello!', fr: 'salut!' })
+       * // content.text : { en: 'hello!', fr: 'salut!' }
+       * const translated = bp.render.translate(content, 'fr')
+       * // content.text : 'salut!'
+       */
+      export function translate<T extends Content>(content: T, lang: string): T
+
+      /**
+       * Renders a content element's {{mustaches}} using the provided context
+       * @param content The content element to be rendered
+       * @param context The context used to filled the {{mustaches}}
+       * @example
+       * const content = bp.render.text('{{user.name}} is awesome!')
+       * // content.text : '{{user.name}} is awesome!'
+       * const payload = bp.render.template(content, { user: { name: 'bob' } })
+       * // payload.text : 'bob is awesome!'
+       */
+      export function template<T extends Content>(content: T, context: any): T
+
+      /**
+       * Creates a pipeline for rendering, translating and templating content
+       * @param lang Language to use for translation
+       * @param context Context to use for templating
+       * @example
+       * // Doing all this
+       * const content = bp.render.text({ en: 'hello {{user.name}}', fr: 'salut {{user.name}}' })
+       * const translated = bp.render.translate(content, 'fr')
+       * const templated = bp.render.template(translated, { user: { name: 'bob' } })
+       *
+       * // Can be replaced by this
+       * const content = bp.render
+       *   .pipeline('fr', { user: { name: 'bob' } })
+       *   .text({ en: 'hello {{user.name}}', fr: 'salut {{user.name}}' })
+       *
+       * // You can reuse the same pipeline for multiple contents
+       * const render = bp.render.pipeline('fr', { user: { name: 'bob', age: 43, pin: 3030 } })
+       * const text1 = render.text({ en: 'hello {{user.name}}', fr: 'salut {{user.name}}' })
+       * const text2 = render.text({ en: 'age : {{user.age}}', fr: 'âge : {{user.age}}' })
+       * const text3 = render.text('PIN : {{user.pin}}')
+       */
+      export function pipeline(lang: string, context: any): RenderPipeline
+    }
   }
 }

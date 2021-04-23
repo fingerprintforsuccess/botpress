@@ -104,7 +104,11 @@ class RootStore {
 
   @computed
   get botAvatarUrl(): string {
-    return this.botInfo?.details?.avatarUrl || this.config?.avatarUrl
+    return (
+      this.botInfo?.details?.avatarUrl ||
+      this.config?.avatarUrl ||
+      (this.config.isEmulator && `${window.ROOT_PATH}/assets/modules/channel-web/images/emulator-default.svg`)
+    )
   }
 
   @computed
@@ -123,14 +127,28 @@ class RootStore {
   }
 
   @action.bound
-  postMessage(name: string) {
+  postMessage(name: string, payload?: any) {
     const chatId = this.config.chatId
-    window.parent.postMessage({ name, chatId }, '*')
+    window.parent.postMessage({ name, chatId, payload }, '*')
   }
 
   @action.bound
   updateMessages(messages) {
     this.currentConversation.messages = messages
+  }
+
+  @action.bound
+  clearMessages() {
+    this.currentConversation.messages = []
+  }
+
+  @action.bound
+  async deleteConversation(): Promise<void> {
+    if (this.currentConversation !== undefined && this.currentConversation.messages.length > 0) {
+      await this.api.deleteMessages(this.currentConversationId)
+
+      this.clearMessages()
+    }
   }
 
   @action.bound
@@ -161,7 +179,7 @@ class RootStore {
     if (isBefore(start, this.currentConversation.typingUntil)) {
       start = this.currentConversation.typingUntil
     }
-    this.currentConversation.typingUntil = new Date(+start + event.timeInMs)
+    this.currentConversation.typingUntil = new Date(+start + Math.floor(event.timeInMs))
     this._startTypingTimer()
   }
 
@@ -190,7 +208,10 @@ class RootStore {
     runInAction('-> setBotInfo', () => {
       this.botInfo = botInfo
     })
-    this.mergeConfig({ extraStylesheet: botInfo.extraStylesheet })
+    this.mergeConfig({
+      extraStylesheet: botInfo.extraStylesheet,
+      disableNotificationSound: botInfo.disableNotificationSound
+    })
   }
 
   @action.bound
@@ -248,11 +269,16 @@ class RootStore {
       return
     }
 
-    await this.sendData({ type: 'text', text: userMessage })
-    trackMessage('sent')
-
-    this.composer.addMessageToHistory(userMessage)
     this.composer.updateMessage('')
+    try {
+      await this.sendData({ type: 'text', text: userMessage })
+      trackMessage('sent')
+
+      this.composer.addMessageToHistory(userMessage)
+    } catch (e) {
+      this.composer.updateMessage(userMessage)
+      throw e
+    }
   }
 
   /** Sends an event to start conversation & hide the bot info page */
@@ -283,6 +309,8 @@ class RootStore {
 
   @action.bound
   async resetSession(): Promise<void> {
+    this.composer.setLocked(false)
+
     return this.api.resetSession(this.currentConversationId)
   }
 
@@ -291,7 +319,7 @@ class RootStore {
     await this.sendData({
       type: 'visit',
       text: 'User visit',
-      timezone: new Date().getTimezoneOffset() / 60,
+      timezone: -(new Date().getTimezoneOffset() / 60), // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/getTimezoneOffset#description
       language: getUserLocale()
     })
   }
@@ -381,13 +409,21 @@ class RootStore {
 
     this.api.updateAxiosConfig({ botId: this.config.botId, externalAuthToken: this.config.externalAuthToken })
     this.api.updateUserId(this.config.userId)
+    this.publishConfigChanged()
   }
 
   /** When this method is used, the user ID is changed in the configuration, then the socket is updated */
   @action.bound
   setUserId(userId: string): void {
     this.config.userId = userId
+    this.resetConversation()
     this.api.updateUserId(userId)
+    this.publishConfigChanged()
+  }
+
+  @action.bound
+  publishConfigChanged() {
+    this.postMessage('configChanged', JSON.stringify(this.config, undefined, 2))
   }
 
   @action.bound

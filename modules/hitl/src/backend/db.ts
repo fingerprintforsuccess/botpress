@@ -307,7 +307,7 @@ export default class HitlDb {
           lastHeardOn: res.last_heard_on,
           isPaused: res.paused,
           pausedBy: res.paused_trigger,
-          lastMessage: {
+          lastMessage: this.anonymizeMessage(res.attributes, {
             id: res.mId,
             type: res.type,
             source: res.source,
@@ -315,7 +315,7 @@ export default class HitlDb {
             raw_message: res.raw_message,
             direction: res.direction,
             ts: res.ts
-          },
+          }),
           user: {
             id: res.userId,
             fullName: res.full_name,
@@ -327,7 +327,16 @@ export default class HitlDb {
   }
 
   async getSessionMessages(sessionId: string): Promise<Message[]> {
-    return this.knex
+    let knex = this.knex;
+    
+    let user = await this.knex
+      .select('srv_channel_users.attributes')
+      .from('hitl_sessions')
+      .join('srv_channel_users', knex.raw('srv_channel_users.user_id'), 'hitl_sessions.userId')
+      .where({ 'hitl_sessions.id': sessionId })
+      .first()
+
+    let q = this.knex
       .orderBy('ts', 'asc')
       .select('*')
       .from(function() {
@@ -338,12 +347,23 @@ export default class HitlDb {
           .select('*')
           .as('q1')
       })
-      .then(messages =>
-        messages.map(msg => ({
-          ...msg,
-          raw_message: this.knex.json.get(msg.raw_message)
-        }))
-      )
+
+    return q.then(messages => messages.map((msg) => this.anonymizeMessage(user.attributes, msg)))
+  }
+
+  anonymizeMessage(user, message) {
+     const processed = { ...message }
+     const sub = 'Zoe'
+
+     if (user.userName) {
+       if (processed.text) {
+         processed.text = processed.text.split(user.userName).join(sub);
+       }
+       if (processed.raw_message.text) {
+         processed.raw_message.text = processed.raw_message.text.split(user.userName).join(sub);
+       }
+     }
+     return processed
   }
 
   async searchSessions(searchTerm: string): Promise<string[]> {

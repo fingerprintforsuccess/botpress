@@ -81,7 +81,7 @@ const NLU: FC<Props> = props => {
   }
 
   const updateEntity = (targetEntity: string, entity) => {
-    // tslint:disable-next-line: no-floating-promises
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
     api.updateEntity(targetEntity, entity)
     const i = entities.findIndex(ent => ent.name === entity.name)
     setEntities([...entities.slice(0, i), entity, ...entities.slice(i + 1)])
@@ -146,13 +146,7 @@ const NLU: FC<Props> = props => {
           />
         )}
         {!!intents.length && currentItem && currentItem.type === 'intent' && (
-          <IntentEditor
-            intent={currentItem.name}
-            api={api}
-            contentLang={props.contentLang}
-            showSlotPanel
-            axios={props.bp.axios} // to be removed for api, requires a lot of refactoring
-          />
+          <IntentEditor intent={currentItem.name} api={api} contentLang={props.contentLang} showSlotPanel />
         )}
         {currentItem && currentItem.type === 'entity' && (
           <EntityEditor

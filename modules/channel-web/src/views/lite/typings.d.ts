@@ -2,6 +2,7 @@ import { RootStore } from './store'
 
 declare global {
   interface Window {
+    __BP_VISITOR_SOCKET_ID: string
     __BP_VISITOR_ID: string
     botpressWebChat: any
     store: RootStore
@@ -35,6 +36,7 @@ export namespace Renderer {
     noBubble?: boolean
     keyboard?: any
     eventId?: string
+    onLoad?: any
 
     isHighlighted?: boolean
     isLastGroup?: boolean
@@ -61,11 +63,13 @@ export namespace Renderer {
     escapeHTML: boolean
     intl?: any
     maxLength?: number
+    linkify?: boolean
   } & Message
 
   export type QuickReply = {
     buttons: any
     quick_replies: any
+    disableFreeText: boolean
   } & Message
 
   export type QuickReplyButton = {
@@ -81,6 +85,7 @@ export namespace Renderer {
       text: string
     }
     escapeTextHTML: boolean
+    onLoad?: any
   }
 
   export interface FileInput {
@@ -143,6 +148,7 @@ export interface Config {
   showUserAvatar: boolean
   showTimestamp: boolean
   enableTranscriptDownload: boolean
+  enableConversationDeletion: boolean
   enableArrowNavigation: boolean
   closeOnEscape: boolean
   botName?: string
@@ -163,6 +169,8 @@ export interface Config {
   disableAnimations: boolean
   /** When true, sets ctrl+Enter as shortcut for reset session then send */
   enableResetSessionShortcut: boolean
+  /** When true, webchat tries to use native webspeech api (uses hosted mozilla and google voice services) */
+  enableVoiceComposer: boolean
   recentConversationLifetime: string
   startNewConvoOnTimeout: boolean
   /** Use sessionStorage instead of localStorage, which means the session expires when tab is closed */
@@ -178,6 +186,8 @@ export interface Config {
   reference: string
   /** If true, Websocket is created when the Webchat is opened. Bot cannot be proactive. */
   lazySocket?: boolean
+  /** If true, chat will no longer play the notification sound for new messages. */
+  disableNotificationSound?: boolean
   /** Refers to a specific webchat reference in parent window. Useful when using multiple chat window */
   chatId?: string
   /** CSS class to be applied to iframe */

@@ -18,7 +18,14 @@ import _ from 'lodash'
 import React, { Component, Fragment } from 'react'
 import ReactDOM from 'react-dom'
 import { connect } from 'react-redux'
-import { DefaultPortModel, DiagramEngine, DiagramWidget, NodeModel, PointModel } from 'storm-react-diagrams'
+import {
+  DefaultLinkModel,
+  DefaultPortModel,
+  DiagramEngine,
+  DiagramWidget,
+  NodeModel,
+  PointModel
+} from 'storm-react-diagrams'
 import {
   buildNewSkill,
   closeFlowNodeProps,
@@ -44,11 +51,12 @@ import { getAllFlows, getCurrentFlow, getCurrentFlowNode, RootReducer } from '~/
 import storage from '~/util/storage'
 
 import { prepareEventForDiagram } from './debugger'
+import DiagramToolbar from './DiagramToolbar'
 import { defaultTransition, DiagramManager, DIAGRAM_PADDING, nodeTypes, Point } from './manager'
 import { BlockModel, BlockProps, BlockWidgetFactory } from './nodes/Block'
 import { DeletableLinkFactory } from './nodes/LinkWidget'
-import style from './style.scss'
 import NodeToolbar from './NodeToolbar'
+import style from './style.scss'
 import TriggerEditor from './TriggerEditor'
 import WorkflowToolbar from './WorkflowToolbar'
 import ZoomToolbar from './ZoomToolbar'
@@ -66,6 +74,7 @@ interface OwnProps {
   setCurrentLang: (lang: string) => void
   languages: string[]
   defaultLang: string
+  mutexInfo: string
   handleFilterChanged: (event: any) => void
 }
 
@@ -74,12 +83,13 @@ type DispatchProps = typeof mapDispatchToProps
 
 type Props = DispatchProps & StateProps & OwnProps
 
-type ExtendedDiagramEngine = {
+export type ExtendedDiagramEngine = {
   enableLinkPoints?: boolean
-  flowBuilder?: any
+  flowBuilder?: Diagram
 } & DiagramEngine
 
 const EXPANDED_NODES_KEY = `bp::${window.BOT_ID}::expandedNodes`
+export const MAX_NUMBER_OF_POINTS_PER_LINK = 3
 
 const getExpandedNodes = () => {
   try {
@@ -93,8 +103,7 @@ class Diagram extends Component<Props> {
   private diagramEngine: ExtendedDiagramEngine
   private diagramWidget: DiagramWidget
   private diagramContainer: HTMLDivElement
-  private searchRef: React.RefObject<HTMLInputElement>
-  private manager: DiagramManager
+  public manager: DiagramManager
   /** Represents the source port clicked when the user is connecting a node */
   private dragPortSource: any
 
@@ -130,6 +139,7 @@ class Diagram extends Component<Props> {
       getSkills: () => this.getPropsProperty('skills'),
       disconnectNode: this.disconnectNode.bind(this),
       // Temporary, maybe we could open the elementinstead of double-click?
+      // eslint-disable-next-line no-console
       editNodeItem: (node, idx) => console.log(node, idx)
     }
 
@@ -141,6 +151,7 @@ class Diagram extends Component<Props> {
     this.diagramEngine.flowBuilder = this
     this.manager = new DiagramManager(this.diagramEngine, {
       switchFlowNode: this.props.switchFlowNode,
+      openFlowNodeProps: this.props.openFlowNodeProps,
       zoomToLevel: this.props.zoomToLevel
     })
 
@@ -214,8 +225,6 @@ class Diagram extends Component<Props> {
         this.props.switchFlow(firstFlow)
       }
     }
-
-    this.searchRef = React.createRef()
   }
 
   componentDidMount() {
@@ -245,7 +254,7 @@ class Diagram extends Component<Props> {
     }
 
     if (this.dragPortSource && !prevProps.currentFlowNode && this.props.currentFlowNode) {
-      // tslint:disable-next-line: no-floating-promises
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
       this.linkCreatedNode()
     }
 
@@ -316,7 +325,7 @@ class Diagram extends Component<Props> {
   }
 
   add = {
-    flowNode: (point: Point) => this.props.createFlowNode({ ...point, type: 'standard' }),
+    flowNode: (point: Point) => this.props.createFlowNode({ ...point, type: 'standard', next: [defaultTransition] }),
     skillNode: (point: Point, skillId: string) => this.props.buildSkill({ location: point, id: skillId }),
     triggerNode: (point: Point) => {
       this.props.createFlowNode({ ...point, type: 'trigger', conditions: [], next: [defaultTransition] })
@@ -346,6 +355,9 @@ class Diagram extends Component<Props> {
     if (target?.model?.['nodeType'] === 'trigger') {
       this.editTriggers(target.model)
     }
+
+    this.props.switchFlowNode(null)
+    this.props.closeFlowNodeProps()
   }
 
   handleContextMenuNoElement = (event: React.MouseEvent) => {
@@ -510,17 +522,22 @@ class Diagram extends Component<Props> {
     this.manager.sanitizeLinks()
     this.manager.cleanPortLinks()
 
-    if (selectedNode && selectedNode instanceof PointModel) {
+    // skip when a link is selected
+    if (selectedNode && selectedNode instanceof DefaultLinkModel) {
+      return
+    }
+
+    // only when creating a link
+    if (selectedNode && selectedNode instanceof PointModel && selectedNode.parent.points.length <= 2) {
       this.dragPortSource = selectedNode
       this.handleContextMenu(event as any)
     }
 
-    this.canTargetOpenInspector(target) ? this.props.openFlowNodeProps() : this.props.closeFlowNodeProps()
+    if (this.canTargetOpenInspector(target)) {
+      this.props.openFlowNodeProps()
+    }
 
-    if (!selectedNode) {
-      this.props.closeFlowNodeProps()
-      this.props.switchFlowNode(null)
-    } else if (selectedNode && (!currentNode || selectedNode.id !== currentNode.id)) {
+    if (selectedNode && (!currentNode || selectedNode.id !== currentNode.id)) {
       // Different node selected
       this.props.switchFlowNode(selectedNode.id)
     }
@@ -614,28 +631,6 @@ class Diagram extends Component<Props> {
     this.props.openFlowNodeProps()
   }
 
-  renderCatchAllInfo() {
-    if (window.USE_ONEFLOW) {
-      return null
-    }
-
-    const nbNext = _.get(this.props.currentFlow, 'catchAll.next.length', 0)
-    const nbReceive = _.get(this.props.currentFlow, 'catchAll.onReceive.length', 0)
-
-    return (
-      <div style={{ display: 'flex', marginTop: 5 }}>
-        <Button onClick={this.handleFlowWideClicked} minimal>
-          <Tag intent={nbNext > 0 ? Intent.PRIMARY : Intent.NONE}>{nbNext}</Tag>{' '}
-          {lang.tr('studio.flow.flowWideTransitions', { count: nbNext })}
-        </Button>
-        <Button onClick={this.handleFlowWideClicked} minimal>
-          <Tag intent={nbReceive > 0 ? Intent.PRIMARY : Intent.NONE}>{nbReceive}</Tag>{' '}
-          {lang.tr('studio.flow.flowWideOnReceives', { count: nbReceive })}
-        </Button>
-      </div>
-    )
-  }
-
   handleToolDropped = async (event: React.DragEvent) => {
     if (this.props.readOnly) {
       return
@@ -679,24 +674,11 @@ class Diagram extends Component<Props> {
     const canAdd = !this.props.defaultLang || this.props.defaultLang === this.props.currentLang
 
     return (
-      <MainLayout.Wrapper
-        className={cx({
-          'emulator-open': this.props.emulatorOpen
-        })}
-      >
-        <WorkflowToolbar />
-
-        <div className={style.searchWrapper}>
-          <SearchBar
-            id="input-highlight-name"
-            className={style.noPadding}
-            ref={this.searchRef}
-            onBlur={this.props.hideSearch}
-            value={this.props.highlightFilter}
-            placeholder={lang.tr('studio.flow.filterNodes')}
-            onChange={value => this.props.handleFilterChanged({ target: { value } })}
-          />
-        </div>
+      <MainLayout.Wrapper>
+        <WorkflowToolbar
+          highlightFilter={this.props.highlightFilter}
+          handleFilterChanged={value => this.props.handleFilterChanged({ target: { value } })}
+        />
         <div
           id="diagramContainer"
           ref={ref => (this.diagramContainer = ref)}
@@ -706,13 +688,23 @@ class Diagram extends Component<Props> {
           onDrop={this.handleToolDropped}
           onDragOver={event => event.preventDefault()}
         >
-          <div className={style.floatingInfo}>{this.renderCatchAllInfo()}</div>
+          <div className={style.floatingInfo}>
+            <DiagramToolbar
+              currentFlow={this.props.currentFlow}
+              handleFlowWideClicked={this.handleFlowWideClicked}
+              mutexInfo={this.props.mutexInfo}
+              highlightNode={node => {
+                this.manager.setHighlightedNodes([node])
+                this.forceUpdate()
+              }}
+            />
+          </div>
 
           <DiagramWidget
             ref={w => (this.diagramWidget = w)}
             deleteKeys={[]}
             diagramEngine={this.diagramEngine}
-            maxNumberPointsPerLink={0}
+            maxNumberPointsPerLink={MAX_NUMBER_OF_POINTS_PER_LINK}
             inverseZoom
           />
           <ZoomToolbar />

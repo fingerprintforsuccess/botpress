@@ -2,16 +2,16 @@ import { EventEmitter } from 'events'
 
 global['NativePromise'] = global.Promise
 
-const yn = require('yn')
-const path = require('path')
 const fs = require('fs')
+const path = require('path')
+const yn = require('yn')
 const metadataContent = require('../../metadata.json')
 const getos = require('./common/getos')
-const { Debug } = require('./debug')
 const { getAppDataPath } = require('./core/misc/app_data')
+const { Debug } = require('./debug')
 
 const printPlainError = err => {
-  // tslint:disable: no-console
+  /* eslint-disable no-console */
   console.log('Error starting botpress')
   console.log(err)
   console.log(err.message)
@@ -59,6 +59,9 @@ process.stderr.write = stripDeprecationWrite
 
 process.on('unhandledRejection', err => {
   global.printErrorDefault(err)
+  if (!process.IS_FAILSAFE) {
+    process.exit(1)
+  }
 })
 
 process.on('uncaughtException', err => {
@@ -81,6 +84,7 @@ try {
   process.DISABLE_GLOBAL_SANDBOX = yn(process.env.DISABLE_GLOBAL_SANDBOX)
   process.DISABLE_BOT_SANDBOX = yn(process.env.DISABLE_BOT_SANDBOX)
   process.DISABLE_TRANSITION_SANDBOX = yn(process.env.DISABLE_TRANSITION_SANDBOX)
+  process.DISABLE_CONTENT_SANDBOX = yn(process.env.DISABLE_CONTENT_SANDBOX)
   process.IS_LICENSED = true
   process.ASSERT_LICENSED = () => {}
   process.BOTPRESS_VERSION = metadataContent.version
@@ -88,16 +92,17 @@ try {
 
   const configPath = path.join(process.PROJECT_LOCATION, '/data/global/botpress.config.json')
 
+  // We can't move this in bootstrap because process.IS_PRO_ENABLED is necessary for other than default CLI command
   if (process.IS_PRO_AVAILABLE) {
     process.CLUSTER_ENABLED = yn(process.env.CLUSTER_ENABLED)
 
-    if (process.env.PRO_ENABLED === undefined) {
+    if (process.env.PRO_ENABLED === undefined && process.env['BP_CONFIG_PRO.ENABLED'] === undefined) {
       if (fs.existsSync(configPath)) {
         const config = require(configPath)
         process.IS_PRO_ENABLED = config.pro && config.pro.enabled
       }
     } else {
-      process.IS_PRO_ENABLED = yn(process.env.PRO_ENABLED)
+      process.IS_PRO_ENABLED = yn(process.env.PRO_ENABLED) || yn(process.env['BP_CONFIG_PRO.ENABLED'])
     }
   }
 
@@ -133,11 +138,41 @@ try {
           if (yn(process.env.BP_DIAG)) {
             require('./diag').default(argv)
           } else {
-            require('./bootstrap')
+            require('./core/app/bootstrap')
           }
         })
       }
     )
+    .command('migrate', 'Migrate your data and database tables to a specific version', yargs => {
+      const start = (cmd, { targetVersion, isDryRun }) => {
+        getos.default().then(distro => {
+          process.distro = distro
+          process.AUTO_MIGRATE = true
+          process.MIGRATE_CMD = cmd
+          process.MIGRATE_TARGET = targetVersion
+          process.MIGRATE_DRYRUN = isDryRun
+          process.VERBOSITY_LEVEL = 2
+
+          require('./core/app/bootstrap')
+        })
+      }
+
+      return yargs
+        .command('up', 'Migrate to the latest version (unless --target is specified)', {}, argv => {
+          start('up', { targetVersion: argv.target, isDryRun: argv.dry })
+        })
+        .command('down', 'Downgrade to a previous version (--target must be specified)', {}, argv => {
+          start('down', { targetVersion: argv.target, isDryRun: argv.dry })
+        })
+        .option('target', {
+          alias: 't',
+          describe: 'Target a specific version'
+        })
+        .option('dryrun', {
+          alias: 'dry',
+          describe: 'Displays the list of migrations that will be executed, without running them'
+        }).argv
+    })
     .command(
       'pull',
       'Pull data from a remote server to your local file system',
@@ -325,7 +360,7 @@ try {
 
         getos.default().then(distro => {
           process.distro = distro
-          require('./lang-server').default(argv)
+          require('./nlu/lang-server').default(argv)
         })
       }
     )
@@ -385,9 +420,7 @@ try {
           type: 'boolean'
         },
         modelCacheSize: {
-          description:
-            'Max allocated memory for model cache. Too few memory will result in more access to file system.',
-          default: '250mb'
+          description: 'Max allocated memory for model cache. Too few memory will result in more access to file system.'
         }
       },
       argv => {
@@ -395,7 +428,7 @@ try {
 
         getos.default().then(distro => {
           process.distro = distro
-          require('./nlu-server').default(argv)
+          require('./nlu/stan').default(argv)
         })
       }
     )
