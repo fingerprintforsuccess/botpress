@@ -5,6 +5,7 @@ import { InjectedIntlProps, injectIntl } from 'react-intl'
 import Add from '../icons/Add'
 import { RootStore, StoreDef } from '../store'
 import { ConversationSummary } from '../typings'
+import PreloadEmoji from './PreloadEmoji'
 
 const ConversationListItem = injectIntl(({ conversation, onClick, hasFocus, intl }: ConversationListItemProps) => {
   const title =
@@ -105,6 +106,7 @@ class ConversationList extends React.Component<ConversationListProps> {
         >
           <Add width={15} height={15} />
         </button>
+        <PreloadEmoji />
       </div>
     )
   }

@@ -2,7 +2,8 @@ import ReactGA from 'react-ga'
 import snarkdown from 'snarkdown'
 import emojiUnicode from 'emoji-unicode'
 import emojiRegexRGI from 'emoji-regex/RGI_Emoji'
-const emojiRegex = emojiRegexRGI()
+
+export const emojiRegex = emojiRegexRGI()
 
 export const getOverridedComponent = (overrides, componentName) => {
   if (overrides?.[componentName]) {
@@ -101,7 +102,7 @@ export const renderUnsafeHTML = (message: string = '', escaped: boolean): string
   return html.replace(/<a href/gi, '<a target="_blank" href')
 }
 
-export const renderEmoji = (emoji: string): string => {
+export const getEmojiUrl = (emoji: string): string => {
   const code = emojiUnicode(emoji)
     .split(' ')
     .map(code => code.padStart(4, '0'))
@@ -109,5 +110,10 @@ export const renderEmoji = (emoji: string): string => {
     .filter(code => code !== '200d')
     .join('-')
 
-  return `<img src="https://f4s-production-uploads.s3-ap-southeast-2.amazonaws.com/emoji/${code}.svg" alt="${emoji}" draggable="false" class="emoji"/>`
+  return `https://f4s-production-uploads.s3-ap-southeast-2.amazonaws.com/emoji/${code}.svg`
+}
+
+export const renderEmoji = (emoji: string): string => {
+  const url = getEmojiUrl(emoji)
+  return `<img src="${url}" alt="${emoji}" draggable="false" class="emoji"/>`
 }
