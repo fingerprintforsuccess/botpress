@@ -70,6 +70,7 @@ class RootStore {
   @observable
   public botUILanguage: string = chosenLocale
 
+  @observable
   public delayedMessages: QueuedMessage[] = []
 
   constructor({ fullscreen }) {
