@@ -563,4 +563,41 @@ export default async (bp: typeof sdk, db: Database) => {
       res.sendStatus(204)
     })
   )
+
+  // This is a re-insertion of an old botpress API to allow us to reset
+  // conversations
+  type F4SChatRequest = ChatRequest & { secret: string }
+
+  router.post(
+    '/conversations/:userId/:conversationId/reset',
+    bp.http.extractExternalToken,
+    asyncMiddleware(async (req: F4SChatRequest, res: Response) => {
+      const { botId, userId, conversationId } = req.params
+      const { secret } = req.body
+
+      if (secret !== 'blu9deB4nj51ULRkd2EaS4zGzLaonFLG') {
+        res.sendStatus(403)
+        return
+      }
+
+      await bp.users.getOrCreateUser('web', userId, botId)
+
+      const payload = {
+        text: 'Reset the conversation',
+        type: 'session_reset'
+      }
+
+      await sendNewMessage(botId, userId, conversationId, payload, req.credentials)
+
+      const sessionId = await bp.dialog.createId({
+        botId,
+        target: userId,
+        threadId: conversationId.toString(),
+        channel: 'web'
+      })
+
+      await bp.dialog.deleteSession(sessionId, botId)
+      res.sendStatus(200)
+    })
+  )
 }
