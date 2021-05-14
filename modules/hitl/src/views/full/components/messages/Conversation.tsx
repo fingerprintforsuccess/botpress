@@ -51,10 +51,11 @@ export default class Conversation extends React.Component<Props> {
     if (!this.state.messages || message.session_id !== this.props.currentSessionId) {
       return
     }
-    const user = this.props.currentSession.user.attributes as any;
-    if (user.username) {
-      message.text = message.text.split(user.username).join('Zoe');
-      message.raw_message.text = message.raw_message.text.split(user.username).join('Zoe');
+    const user = this.props.currentSession.user.attributes as any
+    const username = user.userName
+    if (username) {
+      message.text = message.text.split(username).join('Zoe')
+      message.raw_message.text = message.raw_message.text.split(username).join('Zoe')
     }
 
     this.setState({ messages: [...this.state.messages, message] })
