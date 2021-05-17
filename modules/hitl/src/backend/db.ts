@@ -307,7 +307,7 @@ export default class HitlDb {
           lastHeardOn: res.last_heard_on,
           isPaused: res.paused,
           pausedBy: res.paused_trigger,
-          lastMessage: this.anonymizeMessage(res.attributes, {
+          lastMessage: {
             id: res.mId,
             type: res.type,
             source: res.source,
@@ -315,7 +315,7 @@ export default class HitlDb {
             raw_message: res.raw_message,
             direction: res.direction,
             ts: res.ts
-          }),
+          },
           user: {
             id: res.userId,
             fullName: res.full_name,
@@ -328,7 +328,7 @@ export default class HitlDb {
 
   async getSessionMessages(sessionId: string): Promise<Message[]> {
     let knex = this.knex;
-    
+
     let user = await this.knex
       .select('srv_channel_users.attributes')
       .from('hitl_sessions')
@@ -348,22 +348,7 @@ export default class HitlDb {
           .as('q1')
       })
 
-    return q.then(messages => messages.map((msg) => this.anonymizeMessage(user.attributes, msg)))
-  }
-
-  anonymizeMessage(user, message) {
-     const processed = { ...message }
-     const sub = 'Zoe'
-
-     if (user.userName) {
-       if (processed.text) {
-         processed.text = processed.text.split(user.userName).join(sub);
-       }
-       if (processed.raw_message.text) {
-         processed.raw_message.text = processed.raw_message.text.split(user.userName).join(sub);
-       }
-     }
-     return processed
+    return q
   }
 
   async searchSessions(searchTerm: string): Promise<string[]> {

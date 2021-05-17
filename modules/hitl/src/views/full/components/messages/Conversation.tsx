@@ -5,6 +5,7 @@ import React from 'react'
 import { HitlSessionOverview, Message as HitlMessage } from '../../../../backend/typings'
 import { HitlApi } from '../../api'
 
+import anonymizeMessage from '../anonymize'
 import { ConversationHeader } from './ConversationHeader'
 import { MessageList } from './MessageList'
 
@@ -44,21 +45,15 @@ export default class Conversation extends React.Component<Props> {
     this.setState({ loading: true })
 
     const messages = await this.props.api.fetchSessionMessages(sessionId)
-    this.setState({ loading: false, messages })
+    this.setState({ loading: false, messages: messages.map((msg) => anonymizeMessage(this.props.currentSession.user, msg)) })
   }
 
   appendMessage = (message: HitlMessage) => {
     if (!this.state.messages || message.session_id !== this.props.currentSessionId) {
       return
     }
-    const user = this.props.currentSession.user.attributes as any
-    const username = user.userName
-    if (username) {
-      message.text = message.text.split(username).join('Zoe')
-      message.raw_message.text = message.raw_message.text.split(username).join('Zoe')
-    }
 
-    this.setState({ messages: [...this.state.messages, message] })
+    this.setState({ messages: [...this.state.messages, anonymizeMessage(this.props.currentSession.user, message)] })
   }
 
   tryScrollToBottom(delayed?: boolean) {
