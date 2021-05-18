@@ -27,7 +27,7 @@ export class QuickReplies extends Component<Renderer.QuickReply> {
     if (payload.startsWith('LINK:')) {
       const link = payload.substring('LINK:'.length).split('|');
       if (link[1] === 'NEW') {
-        window.open(link[0], '_blank')
+        window.open(link[0].toLowerCase(), '_blank')
       } else {
         window.parent.location.href = link[0].toLowerCase();
       }
