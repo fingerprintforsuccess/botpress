@@ -67,11 +67,15 @@ const VoiceRecorder: FC<Props> = (props: Props) => {
         // audio format supported by modern browsers
         const ext = mime.getExtension(firstBlob.type) || 'ogg'
 
+        /*
+        Getting type errors on compilation - and we don't use audio, so...
+
         const blob = new Blob(mediaChunks.current)
         const arrayBuffer = await blob.arrayBuffer()
         const buffer = Buffer.from(arrayBuffer)
 
         await props.onDone(buffer, ext)
+        */
       }
     } catch (err) {
       console.error('[VoiceRecorder] - Error converting the audio blob into a buffer', err)

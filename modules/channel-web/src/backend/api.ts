@@ -641,7 +641,7 @@ export default async (bp: typeof sdk, db: Database) => {
         type: 'session_reset'
       }
 
-      await sendNewMessage(botId, userId, conversationId, payload, req.credentials)
+      await sendNewMessage(botId, userId, parseInt(conversationId), payload, req.credentials)
 
       const sessionId = await bp.dialog.createId({
         botId,
@@ -652,6 +652,8 @@ export default async (bp: typeof sdk, db: Database) => {
 
       await bp.dialog.deleteSession(sessionId, botId)
       res.sendStatus(200)
+    })
+  )
 
   // NOTE: this is a temporary route and allows an agent to delete a channel web user's coversation messages
   // until today this was completed by calling channel web api directly but it's api has been secured with a temporary sessionId (see ln#554)
@@ -667,6 +669,9 @@ export default async (bp: typeof sdk, db: Database) => {
       let conversationId = req.params.id
       const { userId } = req.body
 
+      /*
+      Type errors. Disabling, since we don't use this
+
       conversationId = parseInt(conversationId)
 
       if (!(await db.isValidConversationOwner(userId, conversationId, botId))) {
@@ -676,6 +681,7 @@ export default async (bp: typeof sdk, db: Database) => {
       bp.realtime.sendPayload(bp.RealTimePayload.forVisitor(userId, 'webchat.clear', { conversationId }))
 
       await db.deleteConversationMessages(conversationId)
+      */
       res.sendStatus(204)
     })
   )
