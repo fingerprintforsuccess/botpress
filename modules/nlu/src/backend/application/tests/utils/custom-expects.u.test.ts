@@ -52,14 +52,10 @@ export const expectTrainingToStartAndComplete = async (
   expect(botTrainings[0]).toMatchObject(expectTs({ botId, status: 'done' }))
 }
 
-export const expectEngineToHaveTrained = (trainMock: jest.SpyInstance, languageCode: string) => {
-  expect(trainMock).toHaveBeenCalledWith(
-    expect.stringContaining(languageCode),
-    expect.objectContaining({ languageCode }),
-    expect.anything()
-  )
+export const expectEngineToHaveTrained = (trainMock: jest.SpyInstance, botId: string, languageCode: string) => {
+  expect(trainMock).toHaveBeenCalledWith(botId, expect.objectContaining({ language: languageCode }))
 }
 
 export const expectEngineToHaveLoaded = (loadMock: jest.SpyInstance, languageCode: string) => {
-  expect(loadMock).toHaveBeenCalledWith(expect.objectContaining({ languageCode }))
+  expect(loadMock).toHaveBeenCalledWith(expect.objectContaining({ id: expect.objectContaining({ languageCode }) }))
 }

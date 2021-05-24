@@ -11,10 +11,11 @@ import Message from './Message'
 
 class MessageGroup extends React.Component<Props> {
   state = {
-    hasError: false
+    hasError: false,
+    audioPlayingIndex: 0
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error: Error) {
     return { hasError: true }
   }
 
@@ -49,6 +50,14 @@ class MessageGroup extends React.Component<Props> {
     }
 
     return payload
+  }
+
+  onAudioEnded = () => {
+    if (this.state.audioPlayingIndex >= this.props.messages.length - 1) {
+      this.state.audioPlayingIndex = -1
+    } else {
+      this.setState({ ...this.state, audioPlayingIndex: this.state.audioPlayingIndex += 1 })
+    }
   }
 
   render() {
@@ -114,6 +123,8 @@ class MessageGroup extends React.Component<Props> {
                   bp={this.props.bp}
                   store={this.props.store}
                   onLoad={this.props.onLoad}
+                  onAudioEnded={this.onAudioEnded}
+                  shouldPlay={this.state.audioPlayingIndex === i}
                 />
               )
             })}

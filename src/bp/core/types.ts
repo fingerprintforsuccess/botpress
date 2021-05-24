@@ -47,11 +47,8 @@ const TYPES = {
   DialogJanitorRunner: Symbol.for('DialogJanitorRunner'),
   LoggerDbPersister: Symbol.for('LoggerDbPersister'),
   LoggerFilePersister: Symbol.for('LoggerFilePersister'),
-  LogsService: Symbol.for('LogsService'),
   LogsRepository: Symbol.for('LogsRepository'),
   LogJanitorRunner: Symbol.for('LogJanitorRunner'),
-  NotificationsRepository: Symbol.for('NotificationsRepository'),
-  NotificationsService: Symbol.for('NotificationsService'),
   FileCacheInvalidator: Symbol.for('FileCacheInvalidator'),
   BotConfigFactory: Symbol.for('BotConfigFactory'),
   BotConfigWriter: Symbol.for('BotConfigWriter'),
@@ -94,7 +91,8 @@ const TYPES = {
   ConversationRepository: Symbol.for('ConversationRepository'),
   MessageService: Symbol.for('MessageService'),
   ConversationService: Symbol.for('ConversationService'),
-  RenderService: Symbol.for('RenderService')
+  RenderService: Symbol.for('RenderService'),
+  MappingRepository: Symbol.for('MappingRepository')
 }
 
 export { TYPES }

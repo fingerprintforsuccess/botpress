@@ -3,22 +3,24 @@ import bodyParser from 'body-parser'
 import { AxiosBotConfig, AxiosOptions, http, Logger, RouterOptions } from 'botpress/sdk'
 import { CSRF_TOKEN_HEADER_LC, CSRF_TOKEN_HEADER, JWT_COOKIE_NAME } from 'common/auth'
 import LicensingService from 'common/licensing-service'
+import { machineUUID } from 'common/stats'
 import { RequestWithUser } from 'common/typings'
 import compression from 'compression'
 import cookieParser from 'cookie-parser'
 import session from 'cookie-session'
-import { BotService } from 'core/bots'
+import { TYPES } from 'core/app/types'
+import { BotService, BotsRouter } from 'core/bots'
 import { GhostService } from 'core/bpfs'
-import { CMSRouter, CMSService } from 'core/cms'
+import { CMSService } from 'core/cms'
 import { ExternalAuthConfig, ConfigProvider } from 'core/config'
-import { ConverseRouter, ConverseService } from 'core/converse'
+import { ConverseService } from 'core/converse'
 import { FlowService, SkillService } from 'core/dialog'
 import { JobService } from 'core/distributed'
 import { AlertingService, MonitoringService } from 'core/health'
-import { LogsService, LogsRepository } from 'core/logger'
+import { LogsRepository } from 'core/logger'
 import { MediaServiceProvider, MediaRouter } from 'core/media'
 import { ModuleLoader, ModulesRouter } from 'core/modules'
-import { NotificationsService } from 'core/notifications'
+import { getSocketTransports } from 'core/realtime'
 import { InvalidExternalToken, PaymentRequiredError, monitoringMiddleware } from 'core/routers'
 import {
   generateUserToken,
@@ -31,16 +33,13 @@ import {
   TOKEN_AUDIENCE
 } from 'core/security'
 import { TelemetryRouter, TelemetryRepository } from 'core/telemetry'
-import { ActionService, ActionServersService, HintsService, HintsRouter } from 'core/user-code'
+import { ActionService, ActionServersService, HintsService } from 'core/user-code'
 import { WorkspaceService } from 'core/users'
 import cors from 'cors'
 import errorHandler from 'errorhandler'
 import { UnlicensedError } from 'errors'
 import express, { NextFunction, Response } from 'express'
 import rateLimit from 'express-rate-limit'
-import { Request } from 'express-serve-static-core'
-import rewrite from 'express-urlrewrite'
-import fs from 'fs'
 import { createServer, Server } from 'http'
 import { inject, injectable, postConstruct, tagged } from 'inversify'
 import jsonwebtoken from 'jsonwebtoken'
@@ -51,47 +50,31 @@ import { Memoize } from 'lodash-decorators'
 import ms from 'ms'
 import path from 'path'
 import portFinder from 'portfinder'
+import { StudioRouter } from 'studio/studio-router'
 import { URL } from 'url'
 import yn from 'yn'
 
-import { BotsRouter } from '../routers'
-import { NLURouter } from '../routers/bots/nlu'
 import { isDisabled } from '../routers/conditionalMiddleware'
 import { SdkApiRouter } from '../routers/sdk/router'
 import { ShortLinksRouter } from '../routers/shortlinks'
 import { NLUService } from '../services/nlu/nlu-service'
-import { TYPES } from './types'
+import { debugRequestMw, resolveAsset, resolveIndexPaths } from './server-utils'
 
 const BASE_API_PATH = '/api/v1'
 const SERVER_USER_STRATEGY = 'default' // The strategy isn't validated for the userver user, it could be anything.
-
-const debug = DEBUG('api')
-const debugRequest = debug.sub('request')
-
-const debugRequestMw = (req: Request, _res, next) => {
-  debugRequest(`${req.path} %o`, {
-    method: req.method,
-    ip: req.ip,
-    originalUrl: req.originalUrl
-  })
-
-  next()
-}
 
 @injectable()
 export class HTTPServer {
   public httpServer!: Server
   public readonly app: express.Express
   private isBotpressReady = false
+  private machineId!: string
 
   private readonly adminRouter: AdminRouter
   private readonly botsRouter: BotsRouter
-  private cmsRouter!: CMSRouter
-  private nluRouter!: NLURouter
+  private readonly studioRouter!: StudioRouter
   private readonly modulesRouter: ModulesRouter
   private readonly shortLinksRouter: ShortLinksRouter
-  private converseRouter!: ConverseRouter
-  private hintsRouter!: HintsRouter
   private telemetryRouter!: TelemetryRouter
   private mediaRouter: MediaRouter
   private readonly sdkApiRouter!: SdkApiRouter
@@ -105,7 +88,6 @@ export class HTTPServer {
     resource: string,
     noAudit?: boolean
   ) => Promise<boolean>
-  private indexCache: { [pageUrl: string]: string } = {}
 
   private jwksClient?: jwksRsa.JwksClient
   private jwksKeyId?: string
@@ -122,21 +104,19 @@ export class HTTPServer {
     @inject(TYPES.ModuleLoader) moduleLoader: ModuleLoader,
     @inject(TYPES.AuthService) private authService: AuthService,
     @inject(TYPES.MediaServiceProvider) mediaServiceProvider: MediaServiceProvider,
-    @inject(TYPES.LogsService) logsService: LogsService,
-    @inject(TYPES.NotificationsService) notificationService: NotificationsService,
     @inject(TYPES.SkillService) skillService: SkillService,
     @inject(TYPES.GhostService) private ghostService: GhostService,
-    @inject(TYPES.HintsService) private hintsService: HintsService,
+    @inject(TYPES.HintsService) hintsService: HintsService,
     @inject(TYPES.LicensingService) licenseService: LicensingService,
-    @inject(TYPES.ConverseService) private converseService: ConverseService,
+    @inject(TYPES.ConverseService) converseService: ConverseService,
     @inject(TYPES.WorkspaceService) private workspaceService: WorkspaceService,
     @inject(TYPES.BotService) private botService: BotService,
-    @inject(TYPES.AuthStrategies) private authStrategies: AuthStrategies,
+    @inject(TYPES.AuthStrategies) authStrategies: AuthStrategies,
     @inject(TYPES.MonitoringService) private monitoringService: MonitoringService,
     @inject(TYPES.AlertingService) private alertingService: AlertingService,
     @inject(TYPES.JobService) private jobService: JobService,
     @inject(TYPES.LogsRepository) private logsRepo: LogsRepository,
-    @inject(TYPES.NLUService) private nluService: NLUService,
+    @inject(TYPES.NLUService) nluService: NLUService,
     @inject(TYPES.TelemetryRepository) private telemetryRepo: TelemetryRepository
   ) {
     this.app = express()
@@ -165,36 +145,50 @@ export class HTTPServer {
     )
 
     this.adminRouter = new AdminRouter(
-      this.logger,
-      this.authService,
-      this.workspaceService,
-      this.botService,
-      licenseService,
-      this.ghostService,
-      this.configProvider,
-      this.monitoringService,
-      this.alertingService,
-      moduleLoader,
-      this.jobService,
-      this.logsRepo,
-      authStrategies
-    )
-    this.shortLinksRouter = new ShortLinksRouter(this.logger)
-    this.botsRouter = new BotsRouter({
-      actionService,
-      actionServersService,
-      botService,
-      cmsService,
-      configProvider,
-      flowService,
-      mediaServiceProvider,
-      logsService,
-      notificationService,
+      logger,
       authService,
       workspaceService,
+      botService,
+      licenseService,
+      ghostService,
+      configProvider,
+      monitoringService,
+      alertingService,
       moduleLoader,
-      logger: this.logger
-    })
+      jobService,
+      logsRepo,
+      authStrategies,
+      this
+    )
+
+    this.studioRouter = new StudioRouter(
+      logger,
+      authService,
+      workspaceService,
+      botService,
+      configProvider,
+      actionService,
+      cmsService,
+      flowService,
+      ghostService,
+      mediaServiceProvider,
+      actionServersService,
+      hintsService,
+      this
+    )
+
+    this.shortLinksRouter = new ShortLinksRouter(this.logger)
+    this.botsRouter = new BotsRouter(
+      botService,
+      configProvider,
+      authService,
+      workspaceService,
+      nluService,
+      converseService,
+      this.logger,
+      mediaServiceProvider,
+      this
+    )
     this.sdkApiRouter = new SdkApiRouter(this.logger)
     this.telemetryRouter = new TelemetryRouter(this.logger, this.authService, this.telemetryRepo)
     this.mediaRouter = new MediaRouter(
@@ -226,6 +220,7 @@ export class HTTPServer {
 
   @postConstruct()
   async initialize() {
+    this.machineId = await machineUUID()
     await AppLifecycle.waitFor(AppLifecycleEvents.CONFIGURATION_LOADED)
     await this.setupRootPath()
 
@@ -234,30 +229,26 @@ export class HTTPServer {
     this.httpServer = createServer(app)
 
     await this.mediaRouter.initialize()
-    await this.botsRouter.initialize()
-    this.cmsRouter = new CMSRouter(
-      this.logger,
-      this.authService,
-      this.cmsService,
-      this.workspaceService,
-      this.ghostService
-    )
-    this.nluRouter = new NLURouter(this.logger, this.authService, this.workspaceService, this.nluService)
-    this.converseRouter = new ConverseRouter(this.logger, this.converseService, this.authService, this)
-    this.hintsRouter = new HintsRouter(this.logger, this.hintsService, this.authService, this.workspaceService)
-    this.botsRouter.router.use('/content', this.cmsRouter.router)
-    this.botsRouter.router.use('/converse', this.converseRouter.router)
-    this.botsRouter.router.use('/nlu', this.nluRouter.router)
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     AppLifecycle.waitFor(AppLifecycleEvents.BOTPRESS_READY).then(() => {
       this.isBotpressReady = true
     })
-
-    this.botsRouter.router.use('/hints', this.hintsRouter.router)
   }
 
-  resolveAsset = file => path.resolve(process.PROJECT_LOCATION, 'data/assets', file)
+  async getCommonEnv() {
+    const config = await this.configProvider.getBotpressConfig()
+
+    return `
+    window.API_PATH = "${process.ROOT_PATH}/api/v1";
+    window.TELEMETRY_URL = "${process.TELEMETRY_URL}";
+    window.SEND_USAGE_STATS = ${config!.sendUsageStats};
+    window.USE_JWT_COOKIES = ${process.USE_JWT_COOKIES};
+    window.EXPERIMENTAL = ${config.experimental};
+    window.SOCKET_TRANSPORTS = ["${getSocketTransports(config).join('","')}"];
+    window.SHOW_POWERED_BY = ${!!config.showPoweredBy};
+    window.UUID = "${this.machineId}"`
+  }
 
   async start() {
     const botpressConfig = await this.configProvider.getBotpressConfig()
@@ -344,30 +335,15 @@ export class HTTPServer {
       res.send(process.BOTPRESS_VERSION)
     })
 
-    this.app.get('/env.js', async (req, res) => {
-      const branding = await this.configProvider.getBrandingConfig('admin')
-
-      res.contentType('text/javascript')
-      res.send(`
-      (function(window) {
-          window.USE_JWT_COOKIES = ${process.USE_JWT_COOKIES};
-          window.APP_VERSION = "${process.BOTPRESS_VERSION}";
-          window.APP_NAME = "${branding.title}";
-          window.APP_FAVICON = "${branding.favicon}";
-          window.APP_CUSTOM_CSS = "${branding.customCss}";
-          window.TELEMETRY_URL = "${process.TELEMETRY_URL}";
-          window.SEND_USAGE_STATS = "${botpressConfig!.sendUsageStats}";
-        })(typeof window != 'undefined' ? window : {})
-      `)
-    })
-
-    this.app.use('/assets', this.guardWhiteLabel(), express.static(this.resolveAsset('')))
-    this.app.use(rewrite('/:app/:botId/*env.js', '/api/v1/bots/:botId/:app/js/env.js'))
-
+    this.setupUILite(this.app)
     this.adminRouter.setupRoutes(this.app)
+    await this.botsRouter.setupRoutes(this.app)
+    await this.studioRouter.setupRoutes(this.app)
+
+    this.app.use('/assets', this.guardWhiteLabel(), express.static(resolveAsset('')))
 
     this.app.use(`${BASE_API_PATH}/modules`, this.modulesRouter.router)
-    this.app.use(`${BASE_API_PATH}/bots/:botId`, this.botsRouter.router)
+
     this.app.use(`${BASE_API_PATH}/sdk`, this.sdkApiRouter.router)
     this.app.use(`${BASE_API_PATH}/telemetry`, this.telemetryRouter.router)
     this.app.use(`${BASE_API_PATH}/media`, this.mediaRouter.router)
@@ -403,8 +379,6 @@ export class HTTPServer {
       })
     })
 
-    this.setupStaticRoutes(this.app)
-
     process.HOST = config.host
     process.PORT = await portFinder.getPortPromise({ port: config.port })
     process.EXTERNAL_URL = process.env.EXTERNAL_URL || config.externalUrl || `http://${process.HOST}:${process.PORT}`
@@ -428,6 +402,31 @@ export class HTTPServer {
     return this.app
   }
 
+  private setupUILite(app) {
+    app.get('/lite/:botId/env.js', async (req, res) => {
+      const { botId } = req.params
+
+      const bot = await this.botService.findBotById(botId)
+      if (!bot) {
+        return res.sendStatus(404)
+      }
+
+      const commonEnv = await this.getCommonEnv()
+      const totalEnv = `
+          (function(window) {
+              ${commonEnv}
+              window.BOT_API_PATH = "${process.ROOT_PATH}/api/v1/bots/${botId}";
+            })(typeof window != 'undefined' ? window : {})
+          `
+
+      res.contentType('text/javascript')
+      res.send(totalEnv)
+    })
+
+    app.use('/:app(lite)/:botId?', express.static(resolveAsset('ui-lite/public'), { index: false }))
+    app.use('/:app(lite)/:botId?', resolveIndexPaths('ui-lite/public/index.html'))
+  }
+
   private guardWhiteLabel() {
     return (req, res, next) => {
       if (path.normalize(req.path) === '/custom-theme.css' && (!process.IS_PRO_ENABLED || !process.IS_LICENSED)) {
@@ -435,49 +434,6 @@ export class HTTPServer {
       }
       next()
     }
-  }
-
-  setupStaticRoutes(app) {
-    // Dynamically updates the static paths of index files
-    const resolveIndexPaths = page => (req, res) => {
-      res.contentType('text/html')
-
-      // Not caching pages in dev (issue with webpack )
-      if (this.indexCache[page] && process.IS_PRODUCTION) {
-        return res.send(this.indexCache[page])
-      }
-
-      fs.readFile(this.resolveAsset(page), (err, data) => {
-        if (data) {
-          this.indexCache[page] = data
-            .toString()
-            .replace(/\<base href=\"\/\" ?\/\>/, `<base href="${process.ROOT_PATH}/" />`)
-            .replace(/ROOT_PATH=""|ROOT_PATH = ''/, `window.ROOT_PATH="${process.ROOT_PATH}"`)
-
-          res.send(this.indexCache[page])
-        } else {
-          res.sendStatus(404)
-        }
-      })
-    }
-
-    app.get('/studio', (req, res, next) => res.redirect('/admin'))
-
-    app.use('/:app(studio)/:botId', express.static(this.resolveAsset('ui-studio/public'), { index: false }))
-    app.use('/:app(studio)/:botId', resolveIndexPaths('ui-studio/public/index.html'))
-
-    app.use('/:app(lite)/:botId?', express.static(this.resolveAsset('ui-studio/public/lite'), { index: false }))
-    app.use('/:app(lite)/:botId?', resolveIndexPaths('ui-studio/public/lite/index.html'))
-
-    app.use('/:app(lite)/:botId', express.static(this.resolveAsset('ui-studio/public'), { index: false }))
-    app.use('/:app(lite)/:botId', resolveIndexPaths('ui-studio/public/index.html'))
-
-    app.get(['/:app(studio)/:botId/*'], resolveIndexPaths('ui-studio/public/index.html'))
-
-    app.use('/admin', express.static(this.resolveAsset('admin/ui/public'), { index: false }))
-    app.get(['/admin', '/admin/*'], resolveIndexPaths('admin/ui/public/index.html'))
-
-    app.get('/', (req, res) => res.redirect(`${process.ROOT_PATH}/admin`))
   }
 
   createRouterForBot(router: string, identity: string, options: RouterOptions): any & http.RouterExtension {
@@ -505,7 +461,7 @@ export class HTTPServer {
   }
 
   async getAxiosConfigForBot(botId: string, options?: AxiosOptions): Promise<AxiosBotConfig> {
-    const basePath = options && options.localUrl ? process.LOCAL_URL : process.EXTERNAL_URL
+    const basePath = options?.localUrl ? process.LOCAL_URL : process.EXTERNAL_URL
     const serverToken = generateUserToken({
       email: SERVER_USER,
       strategy: SERVER_USER_STRATEGY,
@@ -516,7 +472,7 @@ export class HTTPServer {
     })
 
     return {
-      baseURL: `${basePath}/api/v1/bots/${botId}`,
+      baseURL: options?.studioUrl ? `${basePath}/api/v1/studio/${botId}` : `${basePath}/api/v1/bots/${botId}`,
       headers: {
         ...(process.USE_JWT_COOKIES
           ? { Cookie: `${JWT_COOKIE_NAME}=${serverToken.jwt};`, [CSRF_TOKEN_HEADER]: serverToken.csrf }

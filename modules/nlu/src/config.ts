@@ -1,6 +1,17 @@
-import { LanguageSource } from 'common/nlu/engine'
+export interface LanguageSource {
+  endpoint: string
+  authToken?: string
+}
+
+type StanConfig = { autoStart: true } | ({ autoStart: false } & LanguageSource)
 
 export interface Config {
+  /**
+   * If you want to manually start standalone NLU, set autoStart to false and specify endpoint and auth token.
+   * @default { "autoStart": true }
+   */
+  nluServer: StanConfig
+
   /**
    * If you want a fully on-prem installation, you can host
    * Facebook's Duckling on your own infrastructure and change this URL
@@ -29,20 +40,27 @@ export interface Config {
 
   /**
    * Maximum allowed model cache size
+   * @default 850mb
    */
-  modelCacheSize?: string
+  modelCacheSize: string
 
   /**
    * Maximum number of concurrent trainings per Botpress instance
-   * @default 2
+   * @default 1
    * @optional
    */
   maxTrainingPerInstance?: number
 
   /**
    * Whether or not to train bots that require training on mount
-   * @default true
+   * @default false
    * @optional
    */
   queueTrainingOnBotMount?: boolean
+
+  /**
+   * Whether or not you want to use the deprecated legacy election
+   * @default false
+   */
+  legacyElection: boolean
 }

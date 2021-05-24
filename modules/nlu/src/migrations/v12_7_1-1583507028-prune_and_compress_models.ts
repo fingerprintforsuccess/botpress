@@ -1,5 +1,4 @@
 import * as sdk from 'botpress/sdk'
-import { Model } from 'common/nlu/engine'
 import fse, { WriteStream } from 'fs-extra'
 import _ from 'lodash'
 import path from 'path'
@@ -9,6 +8,23 @@ import tmp from 'tmp'
 
 export const MODELS_DIR = './models'
 const MAX_MODELS_TO_KEEP = 2
+
+interface ModelId {
+  specificationHash: string // represents the nlu engine that was used to train the model
+  contentHash: string // represents the intent and entity definitions the model was trained with
+  seed: number // number to seed the random number generators used during nlu training
+  languageCode: string // language of the model
+}
+
+interface Model {
+  id: ModelId
+  startedAt: Date
+  finishedAt: Date
+  data: {
+    input: string
+    output: string
+  }
+}
 
 function makeFileName(hash: string, lang: string): string {
   return `${hash}.${lang}.model`
@@ -55,7 +71,7 @@ async function getModel(ghost: sdk.ScopedGhostService, hash: string, lang: strin
 
 async function saveModel(ghost: sdk.ScopedGhostService, model: Model, hash: string): Promise<void | void[]> {
   const serialized = JSON.stringify(model)
-  const modelName = makeFileName(hash, model.languageCode)
+  const modelName = makeFileName(hash, model.id.languageCode)
   const tmpDir = tmp.dirSync({ unsafeCleanup: true })
   const tmpFileName = path.join(tmpDir.name, 'model')
   await fse.writeFile(tmpFileName, serialized)
@@ -73,7 +89,7 @@ async function saveModel(ghost: sdk.ScopedGhostService, model: Model, hash: stri
   const buffer = await fse.readFile(archiveName)
   await ghost.upsertFile(MODELS_DIR, modelName, buffer)
   tmpDir.removeCallback()
-  return pruneModels(ghost, model.languageCode)
+  return pruneModels(ghost, model.id.languageCode)
 }
 
 const migration: sdk.ModuleMigration = {

@@ -1,5 +1,7 @@
 import { checkRule, CSRF_TOKEN_HEADER_LC, JWT_COOKIE_NAME } from 'common/auth'
 import { RequestWithUser } from 'common/typings'
+import { ALL_BOTS } from 'common/utils'
+import { ConfigProvider } from 'core/config'
 import {
   InvalidOperationError,
   BadRequestError,
@@ -10,7 +12,7 @@ import {
   UnauthorizedError
 } from 'core/routers'
 import { WorkspaceService } from 'core/users'
-import { NextFunction, Request, Response } from 'express'
+import { NextFunction, Request, RequestHandler, Response } from 'express'
 import { AuthService, WORKSPACE_HEADER, SERVER_USER } from './auth-service'
 
 const debugFailure = DEBUG('audit:collab:fail')
@@ -217,4 +219,35 @@ const checkPermissions = (workspaceService: WorkspaceService) => (
   }
 
   audit(debugSuccess, { userRole: role?.id })
+}
+
+const mediaPathRegex = new RegExp(/^\/api\/v(\d)\/bots\/[A-Z0-9_-]+\/media\//, 'i')
+export const checkBotVisibility = (configProvider: ConfigProvider, checkTokenHeader: RequestHandler) => async (
+  req,
+  res,
+  next
+) => {
+  if (req.params.botId === ALL_BOTS || req.originalUrl.endsWith('env.js')) {
+    return next()
+  }
+
+  try {
+    const config = await configProvider.getBotConfig(req.params.botId)
+    if (config.disabled) {
+      // The user must be able to get the config to change the bot status
+      if (req.originalUrl.endsWith(`/api/v1/bots/${req.params.botId}`)) {
+        return next()
+      }
+
+      return next(new NotFoundError('Bot is disabled'))
+    }
+
+    if (config.private && !mediaPathRegex.test(req.originalUrl)) {
+      return checkTokenHeader(req, res, next)
+    }
+  } catch (err) {
+    return next(new NotFoundError('Invalid Bot ID'))
+  }
+
+  next()
 }

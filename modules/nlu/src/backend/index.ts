@@ -3,9 +3,6 @@ import * as sdk from 'botpress/sdk'
 import _ from 'lodash'
 
 import { createApi } from '../api'
-import en from '../translations/en.json'
-import es from '../translations/es.json'
-import fr from '../translations/fr.json'
 
 import { registerRouter, removeRouter } from './api'
 import { NLUApplication } from './application'
@@ -23,7 +20,7 @@ let app: NLUApplication | undefined
 
 const onServerStarted = async (bp: typeof sdk) => {
   app = await bootStrap(bp)
-  registerMiddlewares(bp, app)
+  await registerMiddlewares(bp, app)
 }
 
 const onServerReady = async (bp: typeof sdk) => {
@@ -95,16 +92,9 @@ const entryPoint: sdk.ModuleEntryPoint = {
   onModuleUnmount,
   dialogConditions,
   onTopicChanged,
-  translations: { en, fr, es },
   definition: {
     name: 'nlu',
-    moduleView: {
-      stretched: true
-    },
-    menuIcon: 'translate',
-    menuText: 'NLU',
-    fullName: 'NLU',
-    homepage: 'https://botpress.com'
+    noInterface: true
   }
 }
 

@@ -1,9 +1,9 @@
 import * as sdk from 'botpress/sdk'
+import { TYPES } from 'core/app/types'
 import { BotpressConfig, ConfigProvider } from 'core/config'
 import Database from 'core/database'
 import { JobService } from 'core/distributed'
 import { KeyValueStore } from 'core/kvs'
-import { TYPES } from 'core/types'
 import { ChannelUserRepository } from 'core/users'
 import { inject, injectable, tagged } from 'inversify'
 import { Redis } from 'ioredis'
@@ -97,7 +97,8 @@ export class StateManager {
       Object.defineProperty(state, 'workflow', {
         get() {
           return state.session.workflows[state.session.currentWorkflow!]
-        }
+        },
+        configurable: true
       })
     }
   }
