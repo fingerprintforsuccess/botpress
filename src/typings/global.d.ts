@@ -21,7 +21,6 @@ declare namespace NodeJS {
     IS_PRODUCTION: boolean // TODO: look to remove this
     BPFS_STORAGE: 'database' | 'disk'
     APP_SECRET: string
-    NLU_PASSWORD: string | undefined
     /**
      * Path to the global APP DATA folder, shared across all installations of Botpress Server
      * Use this folder to store stuff you'd like to cache, like NLU language models etc
@@ -29,6 +28,8 @@ declare namespace NodeJS {
     APP_DATA_PATH: string
     HOST: string
     PORT: number
+    STUDIO_PORT: number
+    NLU_PORT: number
     PROXY?: string
     EXTERNAL_URL: string
     LOCAL_URL: string
@@ -61,6 +62,8 @@ declare namespace NodeJS {
     WEB_WORKER: number
     TRAINING_WORKERS: number[]
     USE_JWT_COOKIES: boolean
+    // The internal password is used for inter-process communication
+    INTERNAL_PASSWORD: string
   }
 }
 
@@ -95,6 +98,13 @@ declare interface BotpressEnvironmentVariables {
    * @example redis://username:password@localhost:6379
    */
   readonly REDIS_URL?: string
+
+  /**
+   * The scope or channel prefix used by RedisIO to differentiate multiple clusters of Botpress using the same Redis Cluster.
+   * See: https://redis.io/topics/pubsub#database-amp-scoping
+   * @example production, staging, test, development, botpress1, ...
+   */
+  readonly BP_REDIS_SCOPE?: string
 
   /**
    * The database connection string. The first part indicates which database to use
@@ -276,6 +286,16 @@ declare interface BotpressEnvironmentVariables {
    * ex: ['nlu', 'nlu-testing']
    */
   readonly BP_ENABLED_MODULES?: string
+
+  /**
+   * The complete path to the out/ folder of the studio
+   */
+  readonly DEV_STUDIO_PATH?: string
+
+  /**
+   * The complete path to the dist/ folder of packages/nlu/dist
+   */
+  readonly DEV_NLU_PATH?: string
 }
 
 interface IDebug {

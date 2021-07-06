@@ -58,7 +58,7 @@ function renderSlack(data) {
 
 function renderElement(data, channel) {
   // These channels now use channel renderers
-  if (['telegram', 'twilio', 'slack', 'smooch', 'vonage', 'teams'].includes(channel)) {
+  if (['telegram', 'twilio', 'slack', 'smooch', 'vonage', 'teams', 'messenger'].includes(channel)) {
     return utils.extractPayload('dropdown', data)
   }
 
@@ -138,11 +138,7 @@ module.exports = {
         type: 'boolean',
         title: 'module.extensions.types.dropdown.allowMultiple'
       },
-      markdown: {
-        type: 'boolean',
-        title: 'module.extensions.types.dropdown.useMarkdown',
-        default: true
-      },
+      ...base.useMarkdown,
       ...base.typingIndicators
     }
   },

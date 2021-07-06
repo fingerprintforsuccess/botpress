@@ -61,8 +61,12 @@ build/tests/e2e/screenshots/*
 # tests output
 cache
 
+<<<<<<< HEAD
 modules/*/dist/*
 modules/*/assets/web/*
 modules/*.tgz
 modules/*/*.tgz
 modules/.cache
+modules/*/assets/config.schema.json
+**/out/**
+**/dist/**
