@@ -221,13 +221,13 @@ class MessageList extends React.Component<MessageListProps, State> {
     return m.message_type !== 'postback'
   }
 
-  handleScroll = debounce(e => {
+  handleScroll = e => {
     const scroll = this.messagesDiv.scrollHeight - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
     const manualScroll = scroll >= 1
     const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
 
     this.setState({ manualScroll, showNewMessageIndicator })
-  }, 50)
+  }
 
   render() {
     return (
