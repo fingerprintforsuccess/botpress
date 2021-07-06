@@ -14,6 +14,7 @@ import Avatar from '../common/Avatar'
 import MessageGroup from './MessageGroup'
 
 interface State {
+  autoscroll: number
   manualScroll: boolean
   showNewMessageIndicator: boolean
 }
@@ -22,10 +23,16 @@ class MessageList extends React.Component<MessageListProps, State> {
   private messagesDiv: HTMLElement
   private divSizeObserver: ResizeObserver
   private lastHeight: number
-  state: State = { showNewMessageIndicator: false, manualScroll: false }
+  state: State = { autoscroll: null, showNewMessageIndicator: false, manualScroll: false }
 
   componentDidMount() {
     this.tryScrollToBottom(true)
+
+    this.setState({
+      autoscroll: window.setInterval(() => {
+        if (!this.state.manualScroll) { this.tryScrollToBottom() }
+      }, 100)
+    });
 
     observe(this.props.focusedArea, focus => {
       focus.newValue === 'convo' && this.messagesDiv.focus()
@@ -71,6 +78,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
   componentWillUnmount() {
     this.divSizeObserver.disconnect()
+    if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll); }
   }
 
   tryScrollToBottom(delayed?: boolean) {
