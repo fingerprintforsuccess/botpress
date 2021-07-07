@@ -1,6 +1,6 @@
 /**
  * Generated file from emoji-regex/RGI_Emoji https://mths.be/emoji
- * Modified to allow an optional default variation selector \uFEF0
+ * Modified to allow an optional default variation selector \uFE0F
  * */
 /* eslint-disable unicorn/better-regex, unicorn/no-hex-escape */
 module.exports = () => {
