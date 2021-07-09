@@ -1,7 +1,7 @@
 import ReactGA from 'react-ga'
 import snarkdown from 'snarkdown'
 import emojiUnicode from 'emoji-unicode'
-import emojiRegexRGI from 'emoji-regex/RGI_Emoji'
+import emojiRegexRGI from './RGI_Emoji'
 
 export const emojiRegex = emojiRegexRGI()
 
