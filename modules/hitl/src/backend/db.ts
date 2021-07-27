@@ -295,7 +295,7 @@ export default class HitlDb {
 
     return query
       .orderBy('hitl_sessions.last_event_on', 'desc')
-      .limit(100)
+      .limit(1000)
       .then(results =>
         results.map(res => ({
           id: res.session_id,
