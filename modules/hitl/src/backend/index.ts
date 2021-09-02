@@ -39,7 +39,7 @@ const entryPoint: sdk.ModuleEntryPoint = {
   translations: { en, fr },
   definition: {
     name: 'hitl',
-    menuIcon: 'headset',
+    menuIcon: 'feedback',
     menuText: 'HITL',
     fullName: 'Human In The Loop',
     homepage: 'https://botpress.com'

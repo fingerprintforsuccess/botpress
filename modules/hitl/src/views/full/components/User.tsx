@@ -5,7 +5,6 @@ import moment from 'moment'
 import React, { FC } from 'react'
 
 import { HitlSessionOverview } from '../../../backend/typings'
-import AnonymizeMessage from './anonymize'
 
 interface Props {
   session: HitlSessionOverview
@@ -35,7 +34,7 @@ const User: FC<Props> = props => {
           <span>
             <Text ellipsize={true} className="bph-user-summary">
               <span className="bph-user-source">{textPrefix}</span>
-              {AnonymizeMessage(user, lastMessage).text}
+              {lastMessage.text}
             </Text>
           </span>
         </div>

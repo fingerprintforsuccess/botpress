@@ -5,6 +5,8 @@ import _ from 'lodash'
 import { SDK } from '.'
 import { HitlSession, HitlSessionOverview, Message, SessionIdentity } from './typings'
 
+const toBool = s => this.knex.bool.parse(s)
+
 // trims SQL queries from objects
 const toPlainObject = object =>
   _.mapValues(object, v => {
@@ -256,7 +258,6 @@ export default class HitlDb {
   async isSessionPaused(session: SessionIdentity): Promise<boolean> {
     const { botId, channel, userId, sessionId, threadId } = session
 
-    const toBool = s => this.knex.bool.parse(s)
     return this.knex('hitl_sessions')
       .where(sessionId ? { id: sessionId } : { botId, channel, userId, threadId })
       .select('paused')
@@ -326,16 +327,7 @@ export default class HitlDb {
   }
 
   async getSessionMessages(sessionId: string): Promise<Message[]> {
-    let knex = this.knex;
-
-    let user = await this.knex
-      .select('srv_channel_users.attributes')
-      .from('hitl_sessions')
-      .join('srv_channel_users', knex.raw('srv_channel_users.user_id'), 'hitl_sessions.userId')
-      .where({ 'hitl_sessions.id': sessionId })
-      .first()
-
-    let q = this.knex
+    return this.knex
       .orderBy('ts', 'asc')
       .select('*')
       .from(function() {
@@ -346,8 +338,12 @@ export default class HitlDb {
           .select('*')
           .as('q1')
       })
-
-    return q
+      .then(messages =>
+        messages.map(msg => ({
+          ...msg,
+          raw_message: this.knex.json.get(msg.raw_message)
+        }))
+      )
   }
 
   async searchSessions(searchTerm: string): Promise<string[]> {
@@ -368,7 +364,7 @@ export default class HitlDb {
 
     return query
       .orderBy('last_heard_on')
-      .limit(100)
+      .limit(1000)
       .then(results => results.map(r => r.id))
   }
 }

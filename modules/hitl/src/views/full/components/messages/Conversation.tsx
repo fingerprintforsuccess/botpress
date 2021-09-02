@@ -1,11 +1,9 @@
 import _ from 'lodash'
-import debounce from 'lodash/debounce'
 import React from 'react'
 
 import { HitlSessionOverview, Message as HitlMessage } from '../../../../backend/typings'
 import { HitlApi } from '../../api'
 
-import anonymizeMessage from '../anonymize'
 import { ConversationHeader } from './ConversationHeader'
 import { MessageList } from './MessageList'
 
@@ -21,8 +19,7 @@ export default class Conversation extends React.Component<Props> {
 
   state = {
     loading: true,
-    messages: null,
-    manualScroll: false
+    messages: null
   }
 
   componentDidMount() {
@@ -35,7 +32,7 @@ export default class Conversation extends React.Component<Props> {
   }
 
   async componentDidUpdate(prevProps) {
-    if (!this.state.manualScroll) this.tryScrollToBottom()
+    this.tryScrollToBottom()
     if (prevProps.currentSessionId !== this.props.currentSessionId) {
       await this.fetchSessionMessages(this.props.currentSessionId)
     }
@@ -45,7 +42,9 @@ export default class Conversation extends React.Component<Props> {
     this.setState({ loading: true })
 
     const messages = await this.props.api.fetchSessionMessages(sessionId)
-    this.setState({ loading: false, messages: messages.map((msg) => anonymizeMessage(this.props.currentSession.user, msg)) })
+    this.setState({ loading: false, messages })
+
+    this.tryScrollToBottom()
   }
 
   appendMessage = (message: HitlMessage) => {
@@ -53,7 +52,8 @@ export default class Conversation extends React.Component<Props> {
       return
     }
 
-    this.setState({ messages: [...this.state.messages, anonymizeMessage(this.props.currentSession.user, message)] })
+    this.setState({ messages: [...this.state.messages, message] })
+    this.tryScrollToBottom()
   }
 
   tryScrollToBottom(delayed?: boolean) {
@@ -69,12 +69,6 @@ export default class Conversation extends React.Component<Props> {
     )
   }
 
-  handleScroll = (e) => {
-    const scroll = e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight
-    const manualScroll = scroll >= 150
-    if (this.state.manualScroll != manualScroll) this.setState({ manualScroll })
-  }
-
   render() {
     if (!this.props.currentSession) {
       return null
@@ -84,11 +78,7 @@ export default class Conversation extends React.Component<Props> {
     const displayName = _.get(user, 'attributes.full_name', user.fullName)
 
     return (
-      <div
-        className="bph-conversation"
-        style={{ overflow: 'hidden' }}
-        onScroll={this.handleScroll}
-      >
+      <div className="bph-conversation" style={{ overflow: 'hidden' }}>
         <ConversationHeader api={this.props.api} displayName={displayName} isPaused={!!isPaused} sessionId={id} />
 
         <div className="bph-conversation-messages" ref={m => (this.messagesDiv = m)}>
