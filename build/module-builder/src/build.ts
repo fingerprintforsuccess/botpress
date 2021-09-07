@@ -114,7 +114,7 @@ const compileBackend = (modulePath: string, babelConfig) => {
     ignore: ['**/*.d.ts', '**/views/**/*.*', '**/config.ts']
   })
 
-  const copyWithoutTransform = ['actions', 'hooks', 'examples', 'content-types']
+  const copyWithoutTransform = ['actions', 'hooks', 'examples', 'content-types', 'bot-templates']
   const outputFiles = []
 
   for (const file of files) {
@@ -192,7 +192,7 @@ const getTsConfig = (rootFolder: string): ts.ParsedCommandLine => {
       typeRoots: ['./node_modules/@types', './node_modules', './src/typings']
     },
     exclude: ['**/*.test.ts', './src/views/**', '**/node_modules/**'],
-    include: ['../../src/typings/*.d.ts', '**/*.ts']
+    include: ['../../packages/bp/src/typings/*.d.ts', '**/*.ts']
   }
 
   return ts.parseJsonConfigFileContent(fixedModuleConfig, parseConfigHost, rootFolder)

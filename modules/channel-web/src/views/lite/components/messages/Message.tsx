@@ -6,9 +6,11 @@ import { InjectedIntlProps, injectIntl } from 'react-intl'
 
 import { RootStore, StoreDef } from '../../store'
 import { Renderer } from '../../typings'
+import { showContextMenu } from '../ContextMenu'
 import * as Keyboard from '../Keyboard'
 
 import { Carousel, FileMessage, LoginPrompt, Text, VoiceMessage } from './renderer'
+import { Dropdown } from './renderer/Dropdown'
 
 class Message extends Component<MessageProps> {
   state = {
@@ -96,6 +98,11 @@ class Message extends Component<MessageProps> {
       return this.render_unsupported()
     }
 
+    // TODO: Remove eventually, it's for backward compatibility
+    if (module === 'extensions' && component === 'Dropdown') {
+      return this.render_dropdown()
+    }
+
     const InjectedModuleView = this.props.store.bp.getModuleInjector()
 
     const messageDataProps = { ...this.props.payload }
@@ -103,7 +110,7 @@ class Message extends Component<MessageProps> {
     delete messageDataProps.component
 
     const sanitizedProps = pick(this.props, [
-      'incomingEventId',
+      'messageId',
       'isLastGroup',
       'isLastOfGroup',
       'isBotMessage',
@@ -137,11 +144,12 @@ class Message extends Component<MessageProps> {
     return '*Unsupported message type*'
   }
 
+  render_dropdown() {
+    return <Dropdown {...this.props} {...this.props.payload} escapeHTML={this.props.store.escapeHTML}></Dropdown>
+  }
+
   handleContextMenu = e => {
-    const showContextMenu = window.botpress.extensions && window.botpress.extensions.showContextMenu
-    if (showContextMenu) {
-      showContextMenu(e, this.props)
-    }
+    showContextMenu(e, this.props)
   }
 
   renderTimestamp() {
@@ -150,6 +158,10 @@ class Message extends Component<MessageProps> {
         {this.props.store.intl.formatTime(new Date(this.props.sentOn), { hour: 'numeric', minute: 'numeric' })}
       </span>
     )
+  }
+
+  onMessageClicked() {
+    this.props.store.loadEventInDebugger(this.props.messageId, true)
   }
 
   render() {
@@ -161,6 +173,7 @@ class Message extends Component<MessageProps> {
     const wrappedType = this.props.payload && this.props.payload.wrapped && this.props.payload.wrapped.type
     const renderer = (this[`render_${type}`] || this.render_unsupported).bind(this)
     const wrappedClass = `bpw-bubble-${wrappedType}`
+    const isEmulator = this.props.store.config.isEmulator
 
     const rendered = renderer()
     if (rendered === null) {
@@ -180,9 +193,11 @@ class Message extends Component<MessageProps> {
     return (
       <div
         className={classnames(this.props.className, wrappedClass, 'bpw-chat-bubble', `bpw-bubble-${type}`, {
-          'bpw-bubble-highlight': this.props.isHighlighted
+          'bpw-bubble-highlight': this.props.isHighlighted,
+          'bpw-msg-hovering': isEmulator
         })}
         data-from={this.props.fromLabel}
+        onClick={() => this.onMessageClicked()}
         tabIndex={-1}
         style={additionalStyle}
       >
