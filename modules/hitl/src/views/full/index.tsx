@@ -1,6 +1,5 @@
 import { Callout } from '@blueprintjs/core'
-import { Container } from 'botpress/ui'
-import { toastFailure } from 'botpress/utils'
+import { ModuleUI, toast } from 'botpress/shared'
 import _ from 'lodash'
 import React from 'react'
 
@@ -13,6 +12,8 @@ import Composer from './components/Composer'
 import Conversation from './components/messages/Conversation'
 import Profile from './components/Profile'
 import Sidebar from './components/Sidebar'
+
+const { Container } = ModuleUI;
 
 interface State {
   loading: boolean
@@ -108,7 +109,7 @@ export default class HitlModule extends React.Component<{ bp: any }, State> {
       const sessions = await this.api.findSessions(this.state.filterSearchText, this.state.filterPaused)
       this.setState({ loading: false, sessions })
     } catch (err) {
-      toastFailure(err.message)
+      toast.failure(err.message)
     }
   }
 

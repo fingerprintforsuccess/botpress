@@ -299,13 +299,8 @@ export default class HitlDb {
     }
 
     return query
-<<<<<<< HEAD
-      .orderBy('hitl_sessions.last_event_on', 'desc')
-      .limit(1000)
-=======
       .orderBy(`${TABLE_NAME_SESSIONS}.last_event_on`, 'desc')
-      .limit(100)
->>>>>>> botpress-master
+      .limit(1000)
       .then(results =>
         results.map(res => ({
           id: res.session_id,
