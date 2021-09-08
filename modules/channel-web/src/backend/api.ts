@@ -654,7 +654,7 @@ export default async (bp: typeof sdk, db: Database) => {
         type: 'session_reset'
       }
 
-      await sendNewMessage(botId, userId, parseInt(conversationId), payload, req.credentials)
+      await sendNewMessage(req, payload, false)
 
       const sessionId = await bp.dialog.createId({
         botId,

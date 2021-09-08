@@ -7,10 +7,10 @@ import { emojiRegex, getEmojiUrl } from '../utils'
 const PreloadEmoji = ({ delayedMessages }: PreloadEmojiProps) => {
   delayedMessages
     ?.map(({ message }) => {
-      if (message.message_type === 'text') {
-        return message.message_text
+      if (message.payload.text) {
+        return message.payload.text
       }
-      if (message.message_type === 'custom') {
+      if (message.payload?.wrapped?.text) {
         return message.payload?.wrapped?.text
       }
     })
