@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import React from 'react'
+import anonymizeMessage from '../anonymize'
 
 import { HitlSessionOverview, Message as HitlMessage } from '../../../../backend/typings'
 import { HitlApi } from '../../api'
@@ -42,7 +43,7 @@ export default class Conversation extends React.Component<Props> {
     this.setState({ loading: true })
 
     const messages = await this.props.api.fetchSessionMessages(sessionId)
-    this.setState({ loading: false, messages })
+    this.setState({ loading: false, messages: messages.map((msg) => anonymizeMessage(this.props.currentSession.user, msg)) })
 
     this.tryScrollToBottom()
   }
@@ -52,7 +53,7 @@ export default class Conversation extends React.Component<Props> {
       return
     }
 
-    this.setState({ messages: [...this.state.messages, message] })
+    this.setState({ messages: [...this.state.messages, anonymizeMessage(this.props.currentSession.user, message)] })
     this.tryScrollToBottom()
   }
 

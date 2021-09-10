@@ -296,7 +296,7 @@ export default class HitlDb {
 
     return query
       .orderBy('hitl_sessions.last_event_on', 'desc')
-      .limit(100)
+      .limit(1000)
       .then(results =>
         results.map(res => ({
           id: res.session_id,
@@ -334,7 +334,7 @@ export default class HitlDb {
         this.from('hitl_messages')
           .where({ session_id: sessionId })
           .orderBy('ts', 'desc')
-          .limit(100)
+          .limit(1000)
           .select('*')
           .as('q1')
       })
@@ -364,7 +364,7 @@ export default class HitlDb {
 
     return query
       .orderBy('last_heard_on')
-      .limit(100)
+      .limit(1000)
       .then(results => results.map(r => r.id))
   }
 }
