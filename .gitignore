@@ -63,3 +63,5 @@ cache
 
 modules/*/dist/*
 modules/*/assets/web/*
+modules/*.tgz
+modules/*/*.tgz
