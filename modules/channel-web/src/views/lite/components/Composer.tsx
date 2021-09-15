@@ -3,7 +3,6 @@ import { inject, observer } from 'mobx-react'
 import React from 'react'
 import { FormattedMessage, InjectedIntlProps, injectIntl } from 'react-intl'
 
-import { RecordSpeechToText } from '../../../../../../src/bp/ui-shared-lite/SpeechToTextButton'
 import ToolTip from '../../../../../../src/bp/ui-shared-lite/ToolTip'
 import { RootStore, StoreDef } from '../store'
 
@@ -67,23 +66,24 @@ class Composer extends React.Component<ComposerProps, { isRecording: boolean }> 
     )
   }
 
-  onVoiceStart() {
-    this.textInput.current.focus()
+  onVoiceStart = () => {
     this.setState({ isRecording: true })
   }
 
-  onVoiceEnd() {
+  onVoiceEnd = async (voice: Buffer, ext: string) => {
     this.setState({ isRecording: false })
+
+    await this.props.sendVoiceMessage(voice, ext)
   }
 
-  onVoiceNotAvailable() {
-    console.log(
-      'Voice input is not available on this browser. Please check https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API for compatibility'
+  onVoiceNotAvailable = () => {
+    console.warn(
+      'Voice input is not available on this browser. Please check https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder for compatibility'
     )
   }
 
   render() {
-    if(this.props.composerHidden) {
+    if (this.props.composerHidden) {
       return null
     }
 
@@ -118,14 +118,6 @@ class Composer extends React.Component<ComposerProps, { isRecording: boolean }> 
             {placeholder}
           </label>
           <div className={'bpw-send-buttons'}>
-            {this.props.enableVoiceComposer && (
-              <RecordSpeechToText
-                onStart={this.onVoiceStart}
-                onDone={this.onVoiceEnd}
-                onNotAvailable={this.onVoiceNotAvailable}
-                onText={text => this.props.updateMessage(text)}
-              />
-            )}
             <ToolTip childId="btn-send" content={this.props.isEmulator ? 'Interact with your chatbot' : 'Send Message'}>
               <button
                 className={'bpw-send-button'}
@@ -157,6 +149,7 @@ export default inject(({ store }: { store: RootStore }) => ({
   recallHistory: store.composer.recallHistory,
   intl: store.intl,
   sendMessage: store.sendMessage,
+  sendVoiceMessage: store.sendVoiceMessage,
   botName: store.botName,
   setFocus: store.view.setFocus,
   focusedArea: store.view.focusedArea,
@@ -182,6 +175,7 @@ type ComposerProps = {
     | 'intl'
     | 'focusedArea'
     | 'sendMessage'
+    | 'sendVoiceMessage'
     | 'focusPrevious'
     | 'focusNext'
     | 'recallHistory'

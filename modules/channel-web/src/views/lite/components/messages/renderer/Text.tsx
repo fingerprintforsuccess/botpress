@@ -33,25 +33,29 @@ export const Text = (props: Renderer.Text) => {
     message = <p>{truncateIfRequired(text)}</p>
   }
 
-  return (
-    <Linkify properties={{ target: '_blank' }}>
-      <div>{message}</div>
+  const msg = <>
+    <div>{message}</div>
 
-      {hasShowMore && (
-        <button type="button" onClick={e => setShowMore(!showMore)} className="bpw-message-read-more">
-          {showMore &&
-            intl.formatMessage({
-              id: 'messages.showLess',
-              defaultMessage: 'Show Less'
-            })}
-          {!showMore &&
-            intl.formatMessage({
-              id: 'messages.readMore',
-              defaultMessage: 'Read More'
-            })}
-        </button>
-      )}
-    </Linkify>
+    {hasShowMore && (
+      <button type="button" onClick={e => setShowMore(!showMore)} className="bpw-message-read-more">
+        {showMore &&
+          intl.formatMessage({
+            id: 'messages.showLess',
+            defaultMessage: 'Show Less'
+          })}
+        {!showMore &&
+          intl.formatMessage({
+            id: 'messages.readMore',
+            defaultMessage: 'Read More'
+          })}
+      </button>
+    )}
+  </>;
+
+  return (
+    props.linkify
+      ? <Linkify properties={{ target: '_blank' }}>{ msg }</Linkify>
+      : msg
   )
 }
 

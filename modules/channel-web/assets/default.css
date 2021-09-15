@@ -22,6 +22,12 @@ body {
   outline: none !important;
 }
 
+.emoji {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
+}
+
 .hidden {
   visibility: hidden;
   height: 0;
@@ -401,7 +407,6 @@ body {
 }
 
 .bpw-bubble-file a {
-  display: block;
   cursor: pointer;
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
@@ -864,7 +869,6 @@ body {
   margin-right: auto;
   max-width: 50%;
 }
-}
 
 .bpw-botinfo-cover-picture {
   width: 100%;
@@ -1050,4 +1054,5 @@ body {
 
 .bpw-mobx-tools {
   visibility: hidden;
+}
 }

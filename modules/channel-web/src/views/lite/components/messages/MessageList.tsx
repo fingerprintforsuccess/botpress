@@ -14,6 +14,7 @@ import Avatar from '../common/Avatar'
 import MessageGroup from './MessageGroup'
 
 interface State {
+  autoscroll: number
   manualScroll: boolean
   showNewMessageIndicator: boolean
 }
@@ -21,10 +22,19 @@ interface State {
 class MessageList extends React.Component<MessageListProps, State> {
   private messagesDiv: HTMLElement
   private divSizeObserver: ResizeObserver
-  state: State = { showNewMessageIndicator: false, manualScroll: false }
+  private lastHeight: number
+  state: State = { autoscroll: null, showNewMessageIndicator: false, manualScroll: false }
 
   componentDidMount() {
     this.tryScrollToBottom(true)
+
+    this.setState({
+      autoscroll: window.setInterval(() => {
+        if (!this.state.manualScroll) {
+          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
+        }
+      }, 100)
+    });
 
     observe(this.props.focusedArea, focus => {
       focus.newValue === 'convo' && this.messagesDiv.focus()
@@ -39,8 +49,20 @@ class MessageList extends React.Component<MessageListProps, State> {
           return
         }
         this.tryScrollToBottom()
+        this.tryScrollToBottom(true)
       })
     }
+
+    observe(this.props.isBotTyping, v => {
+      if (this.state.manualScroll) {
+        if (!this.state.showNewMessageIndicator) {
+          this.setState({ showNewMessageIndicator: true })
+        }
+        return
+      }
+      this.tryScrollToBottom()
+      this.tryScrollToBottom(true)
+    })
 
     // this should account for keyboard rendering as it triggers a resize of the messagesDiv
     this.divSizeObserver = new ResizeObserver(
@@ -58,13 +80,14 @@ class MessageList extends React.Component<MessageListProps, State> {
 
   componentWillUnmount() {
     this.divSizeObserver.disconnect()
+    if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll); }
   }
 
   tryScrollToBottom(delayed?: boolean) {
     setTimeout(
       () => {
         try {
-          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight
+          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
         } catch (err) {
           // Discard the error
         }
@@ -95,6 +118,7 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   renderDate(date) {
+    return null;
     return (
       <div className={'bpw-date-container'}>
         {this.props.intl.formatTime(new Date(date), {
@@ -146,7 +170,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     })
 
     if (this.props.isBotTyping.get()) {
-      if (lastSpeaker !== 'bot') {
+      if (lastSpeaker?.toLowerCase() !== 'bot') {
         currentGroup = []
         groups.push(currentGroup)
       }
@@ -184,6 +208,7 @@ class MessageList extends React.Component<MessageListProps, State> {
                 key={`msg-group-${i}`}
                 isLastGroup={i >= groups.length - 1}
                 messages={group}
+                onLoad={this.tryScrollToBottom}
               />
             </div>
           )
@@ -196,13 +221,13 @@ class MessageList extends React.Component<MessageListProps, State> {
     return m.message_type !== 'postback'
   }
 
-  handleScroll = debounce(e => {
+  handleScroll = e => {
     const scroll = this.messagesDiv.scrollHeight - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
-    const manualScroll = scroll >= 150
+    const manualScroll = scroll >= 1
     const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
 
     this.setState({ manualScroll, showNewMessageIndicator })
-  }, 50)
+  }
 
   render() {
     return (

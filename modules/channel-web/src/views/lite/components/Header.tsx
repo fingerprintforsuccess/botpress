@@ -66,7 +66,7 @@ class Header extends React.Component<HeaderProps> {
     return (
       <div className={'bpw-header-title'}>
         <div className={'bpw-header-name'}>
-          {title}
+          Hi - I'm {title}
           {this.props.hasUnreadMessages && <span className={'bpw-header-unread'}>{this.props.unreadCount}</span>}
         </div>
         {this.props.hasBotInfoDescription && (

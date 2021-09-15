@@ -7,7 +7,7 @@ export default {
   HISTORY_STARTING_POINT: -1,
   HISTORY_MAX_MESSAGES: 10,
   /** The number of minutes before a new timestamp is displayed */
-  TIME_BETWEEN_DATES: 10,
+  TIME_BETWEEN_DATES: 60 * 24,
   DEFAULT_LAYOUT_WIDTH: 360,
   DEFAULT_CONTAINER_WIDTH: 360,
   SENT_HISTORY_SIZE: 20,

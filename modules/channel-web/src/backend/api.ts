@@ -1,8 +1,10 @@
 import apicache from 'apicache'
 import aws from 'aws-sdk'
+import axios from 'axios'
 import * as sdk from 'botpress/sdk'
 import { asyncMiddleware as asyncMw, BPRequest } from 'common/http'
-import { Response } from 'express'
+import { Request, Response, NextFunction } from 'express'
+import FormData from 'form-data'
 import _ from 'lodash'
 import moment from 'moment'
 import multer from 'multer'
@@ -28,7 +30,8 @@ const SUPPORTED_MESSAGES = [
   'login_prompt',
   'visit',
   'request_start_conversation',
-  'postback'
+  'postback',
+  'voice'
 ]
 
 type ChatRequest = BPRequest & { userId: string; botId: string; conversationId: number }
@@ -104,11 +107,15 @@ export default async (bp: typeof sdk, db: Database) => {
 
   const router = bp.http.createRouterForBot('channel-web', { checkAuthentication: false, enableJsonBodyParser: true })
   const perBotCache = apicache.options({
-    appendKey: req => `${req.method} for bot ${req.params?.boId}`,
+    appendKey: (req: Request, _res: Response) => `${req.method} for bot ${req.params?.boId}`,
     statusCodes: { include: [200] }
   }).middleware
 
-  const assertUserInfo = (options: { convoIdRequired?: boolean } = {}) => async (req: ChatRequest, _res, next) => {
+  const assertUserInfo = (options: { convoIdRequired?: boolean } = {}) => async (
+    req: ChatRequest,
+    _res: Response,
+    next: NextFunction
+  ) => {
     const { botId } = req.params
     const { conversationId, webSessionId } = req.body || {}
 
@@ -180,7 +187,6 @@ export default async (bp: typeof sdk, db: Database) => {
       const payload = req.body.payload || {}
 
       if (!SUPPORTED_MESSAGES.includes(payload.type)) {
-        // TODO: Support files
         return res.status(400).send(ERR_MSG_TYPE)
       }
 
@@ -245,6 +251,46 @@ export default async (bp: typeof sdk, db: Database) => {
   )
 
   router.post(
+    '/messages/voice',
+    bp.http.extractExternalToken,
+    assertUserInfo({ convoIdRequired: true }),
+    asyncMiddleware(async (req: ChatRequest, res: Response) => {
+      const { botId, userId, conversationId } = req
+      const { audio } = req.body
+
+      if (!audio?.buffer || !audio?.title) {
+        throw new Error('Voices messages must contain an audio buffer and title')
+      }
+
+      await bp.users.getOrCreateUser('web', userId, botId) // Just to create the user if it doesn't exist
+
+      const buffer = Buffer.from(audio!.buffer, 'base64')
+
+      const formData = new FormData()
+      formData.append('file', buffer, audio!.title)
+
+      const axiosConfig = await bp.http.getAxiosConfigForBot(botId, { localUrl: true })
+      axiosConfig.headers['Content-Type'] = `multipart/form-data; boundary=${formData.getBoundary()}`
+
+      // Upload the audio buffer to the Media Service
+      const {
+        data: { url }
+      } = await axios.post<{ url: string }>('/media', formData, {
+        ...axiosConfig
+      })
+
+      const payload = {
+        type: 'voice',
+        audio: url
+      }
+
+      await sendNewMessage(botId, userId, conversationId, payload, req.credentials)
+
+      return res.sendStatus(200)
+    })
+  )
+
+  router.post(
     '/conversations/get',
     assertUserInfo({ convoIdRequired: true }),
     asyncMiddleware(async (req: ChatRequest, res: Response) => {
@@ -278,15 +324,19 @@ export default async (bp: typeof sdk, db: Database) => {
   async function sendNewMessage(
     botId: string,
     userId: string,
-    conversationId,
-    payload,
+    conversationId: number,
+    payload: any,
     credentials: any,
     useDebugger?: boolean,
     user?: sdk.User
   ) {
     const config = await bp.config.getModuleConfigForBot('channel-web', botId)
 
-    if (
+    if (payload.type === 'voice') {
+      if (_.isEmpty(payload.audio)) {
+        throw new Error('Voices messages must contain an audio buffer')
+      }
+    } else if (
       (!payload.text || !_.isString(payload.text) || payload.text.length > config.maxMessageLength) &&
       payload.type !== 'postback'
     ) {
@@ -305,7 +355,7 @@ export default async (bp: typeof sdk, db: Database) => {
       direction: 'incoming',
       payload,
       target: userId,
-      threadId: conversationId,
+      threadId: conversationId.toString(),
       type: payload.type,
       credentials
     })
@@ -568,6 +618,43 @@ export default async (bp: typeof sdk, db: Database) => {
     })
   )
 
+  // This is a re-insertion of an old botpress API to allow us to reset
+  // conversations
+  type F4SChatRequest = ChatRequest & { secret: string }
+
+  router.post(
+    '/conversations/:userId/:conversationId/reset',
+    bp.http.extractExternalToken,
+    asyncMiddleware(async (req: F4SChatRequest, res: Response) => {
+      const { botId, userId, conversationId } = req.params
+      const { secret } = req.body
+
+      if (secret !== 'blu9deB4nj51ULRkd2EaS4zGzLaonFLG') {
+        res.sendStatus(403)
+        return
+      }
+
+      await bp.users.getOrCreateUser('web', userId, botId)
+
+      const payload = {
+        text: 'Reset the conversation',
+        type: 'session_reset'
+      }
+
+      await sendNewMessage(botId, userId, parseInt(conversationId), payload, req.credentials)
+
+      const sessionId = await bp.dialog.createId({
+        botId,
+        target: userId,
+        threadId: conversationId.toString(),
+        channel: 'web'
+      })
+
+      await bp.dialog.deleteSession(sessionId, botId)
+      res.sendStatus(200)
+    })
+  )
+
   // NOTE: this is a temporary route and allows an agent to delete a channel web user's coversation messages
   // until today this was completed by calling channel web api directly but it's api has been secured with a temporary sessionId (see ln#554)
   // soon enough, once channel-web's implementation moves to messaging api we'll be able to remove this and use messaging directly
@@ -582,6 +669,9 @@ export default async (bp: typeof sdk, db: Database) => {
       let conversationId = req.params.id
       const { userId } = req.body
 
+      /*
+      Type errors. Disabling, since we don't use this
+
       conversationId = parseInt(conversationId)
 
       if (!(await db.isValidConversationOwner(userId, conversationId, botId))) {
@@ -591,6 +681,7 @@ export default async (bp: typeof sdk, db: Database) => {
       bp.realtime.sendPayload(bp.RealTimePayload.forVisitor(userId, 'webchat.clear', { conversationId }))
 
       await db.deleteConversationMessages(conversationId)
+      */
       res.sendStatus(204)
     })
   )

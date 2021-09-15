@@ -36,6 +36,7 @@ export namespace Renderer {
     noBubble?: boolean
     keyboard?: any
     eventId?: string
+    onLoad?: any
 
     isHighlighted?: boolean
     isLastGroup?: boolean
@@ -47,6 +48,10 @@ export namespace Renderer {
 
     onSendData?: (data: any) => Promise<void>
     onFileUpload?: (label: string, payload: any, file: File) => Promise<void>
+
+    /** Allows to autoplay voice messages coming from the bot */
+    onAudioEnded?: () => void
+    shouldPlay?: boolean
   }
 
   export type Button = {
@@ -62,6 +67,7 @@ export namespace Renderer {
     escapeHTML: boolean
     intl?: any
     maxLength?: number
+    linkify?: boolean
   } & Message
 
   export type QuickReply = {
@@ -78,11 +84,23 @@ export namespace Renderer {
   export interface FileMessage {
     file: {
       url: string
-      name: string
+      title: string
       storage: string
       text: string
     }
     escapeTextHTML: boolean
+    onLoad?: any
+  }
+
+  export interface VoiceMessage {
+    file: {
+      type: string
+      audio: string
+      autoPlay?: boolean
+    }
+
+    shouldPlay: boolean
+    onAudioEnded: () => void
   }
 
   export interface FileInput {
