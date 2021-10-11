@@ -22,6 +22,12 @@ body {
   outline: none !important;
 }
 
+.emoji {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
+}
+
 .hidden {
   visibility: hidden;
   height: 0;

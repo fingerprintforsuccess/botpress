@@ -13,6 +13,7 @@ import Header from './Header'
 import * as Keyboard from './Keyboard'
 import MessageList from './messages/MessageList'
 import OverridableComponent from './OverridableComponent'
+import PreloadEmoji from './PreloadEmoji'
 
 class Container extends React.Component<ContainerProps> {
   renderBody() {
@@ -53,6 +54,7 @@ class Container extends React.Component<ContainerProps> {
 
     return (
       <React.Fragment>
+        <PreloadEmoji />
         <OverridableComponent name={'before_container'} original={null} />
         <div className={classNames} style={{ width: this.props.dimensions.layout }}>
           <Header />
