@@ -26,13 +26,23 @@ export class QuickReplies extends Component<Renderer.QuickReply> {
   }
 
   handleButtonClicked = (title, payload) => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    this.props.onSendData?.({
-      type: 'quick_reply',
-      text: title,
-      payload
-    })
-    this.props.store.composer.setLocked(false)
+    if (payload.startsWith('LINK:')) {
+      window.parent.location.href = payload.substring('LINK:'.length).toLowerCase()
+      const link = payload.substring('LINK:'.length).split('|');
+      if (link[1] === 'NEW') {
+        window.open(link[0].toLowerCase(), '_blank')
+      } else {
+        window.parent.location.href = link[0].toLowerCase();
+      }
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      this.props.onSendData?.({
+        type: 'quick_reply',
+        text: title,
+        payload
+      })
+      this.props.store.composer.setLocked(false)
+    }
   }
 
   renderKeyboard(buttons: Renderer.QuickReplyButton[]) {

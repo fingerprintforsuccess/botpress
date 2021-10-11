@@ -14,6 +14,7 @@ import Avatar from '../common/Avatar'
 import MessageGroup from './MessageGroup'
 
 interface State {
+  autoscroll: number
   manualScroll: boolean
   showNewMessageIndicator: boolean
 }
@@ -21,10 +22,18 @@ interface State {
 class MessageList extends React.Component<MessageListProps, State> {
   private messagesDiv: HTMLElement
   private divSizeObserver: ResizeObserver
-  state: State = { showNewMessageIndicator: false, manualScroll: false }
+  state: State = { autoscroll: null, showNewMessageIndicator: false, manualScroll: false }
 
   componentDidMount() {
     this.tryScrollToBottom(true)
+
+    this.setState({
+      autoscroll: window.setInterval(() => {
+        if (!this.state.manualScroll) {
+          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
+        }
+      }, 100)
+    })
 
     observe(this.props.focusedArea, focus => {
       focus.newValue === 'convo' && this.messagesDiv.focus()
@@ -58,6 +67,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
   componentWillUnmount() {
     this.divSizeObserver.disconnect()
+    if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll); }
   }
 
   tryScrollToBottom(delayed?: boolean) {
@@ -194,13 +204,13 @@ class MessageList extends React.Component<MessageListProps, State> {
     return m.message_type !== 'postback'
   }
 
-  handleScroll = debounce(e => {
+  handleScroll = e => {
     const scroll = this.messagesDiv.scrollHeight - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
-    const manualScroll = scroll >= 150
+    const manualScroll = scroll >= 1
     const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
 
     this.setState({ manualScroll, showNewMessageIndicator })
-  }, 50)
+  }
 
   render() {
     return (

@@ -1,0 +1,5 @@
+F4S Customisations:
+* Spam scrollToBottom() to eliminate "jumping"
+* Re-insert old reset conversation API, which we still depend on
+* Don't linkify user messages
+* Allow Quick Replies to be used as links that open in new window
