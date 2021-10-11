@@ -97,21 +97,20 @@ class MessageList extends React.Component<MessageListProps, State> {
   renderDate(date) {
     return (
       <div className={'bpw-date-container'}>
-        {this.props.intl.formatTime(new Date(date), {
-          hour12: false,
-          year: 'numeric',
-          month: 'long',
+        {new Intl.DateTimeFormat(this.props.intl.locale || 'en', {
+          month: 'short',
           day: 'numeric',
           hour: 'numeric',
           minute: 'numeric'
-        })}
+        }).format(new Date(date))}
         <div className={'bpw-small-line'} />
       </div>
     )
   }
 
   renderAvatar(name, url) {
-    return <Avatar name={name} avatarUrl={url} height={40} width={40} />
+    const avatarSize = this.props.isEmulator ? 20 : 40 // quick fix
+    return <Avatar name={name} avatarUrl={url} height={avatarSize} width={avatarSize} />
   }
 
   renderMessageGroups() {
@@ -231,6 +230,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
 export default inject(({ store }: { store: RootStore }) => ({
   intl: store.intl,
+  isEmulator: store.isEmulator,
   botName: store.botName,
   isBotTyping: store.isBotTyping,
   botAvatarUrl: store.botAvatarUrl,
@@ -239,7 +239,8 @@ export default inject(({ store }: { store: RootStore }) => ({
   focusNext: store.view.focusNext,
   focusedArea: store.view.focusedArea,
   showUserAvatar: store.config.showUserAvatar,
-  enableArrowNavigation: store.config.enableArrowNavigation
+  enableArrowNavigation: store.config.enableArrowNavigation,
+  preferredLanguage: store.preferredLanguage
 }))(injectIntl(observer(MessageList)))
 
 type MessageListProps = InjectedIntlProps &
@@ -251,8 +252,10 @@ type MessageListProps = InjectedIntlProps &
     | 'focusPrevious'
     | 'focusNext'
     | 'botAvatarUrl'
+    | 'isEmulator'
     | 'botName'
     | 'enableArrowNavigation'
     | 'showUserAvatar'
     | 'currentMessages'
+    | 'preferredLanguage'
   >

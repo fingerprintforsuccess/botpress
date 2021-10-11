@@ -3,8 +3,8 @@ import * as sdk from 'botpress/sdk'
 import _ from 'lodash'
 
 import en from '../translations/en.json'
-import fr from '../translations/fr.json'
 import es from '../translations/es.json'
+import fr from '../translations/fr.json'
 
 import api from './api'
 import Database from './db'
@@ -39,7 +39,8 @@ const entryPoint: sdk.ModuleEntryPoint = {
     fullName: 'Analytics',
     homepage: 'https://botpress.com',
     menuIcon: 'timeline-line-chart',
-    menuText: 'Analytics'
+    menuText: 'Analytics',
+    workspaceApp: { bots: true }
   }
 }
 

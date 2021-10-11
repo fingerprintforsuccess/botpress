@@ -11,10 +11,11 @@ import Message from './Message'
 
 class MessageGroup extends React.Component<Props> {
   state = {
-    hasError: false
+    hasError: false,
+    audioPlayingIndex: 0
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(_error: Error) {
     return { hasError: true }
   }
 
@@ -51,6 +52,14 @@ class MessageGroup extends React.Component<Props> {
     return payload
   }
 
+  onAudioEnded = () => {
+    if (this.state.audioPlayingIndex >= this.props.messages.length - 1) {
+      this.state.audioPlayingIndex = -1
+    } else {
+      this.setState({ ...this.state, audioPlayingIndex: this.state.audioPlayingIndex += 1 })
+    }
+  }
+
   render() {
     const { messages, avatar, isBot, showUserName, userName } = this.props
 
@@ -78,7 +87,7 @@ class MessageGroup extends React.Component<Props> {
             <span data-from={fromLabel} className="from hidden" aria-hidden="true">
               {fromLabel}
             </span>
-            {sortBy(messages, 'eventId').map((message, i, messages) => {
+            {sortBy(messages, ['sent_on', 'eventId']).map((message, i, messages) => {
               const isLastMsg = i === messages.length - 1
               const payload = this.convertPayloadFromOldFormat(message)
 
@@ -113,6 +122,8 @@ class MessageGroup extends React.Component<Props> {
                   onFileUpload={this.props.onFileUpload}
                   bp={this.props.bp}
                   store={this.props.store}
+                  onAudioEnded={this.onAudioEnded}
+                  shouldPlay={this.state.audioPlayingIndex === i}
                 />
               )
             })}

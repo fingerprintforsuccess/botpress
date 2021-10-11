@@ -1,8 +1,8 @@
 import * as sdk from 'botpress/sdk'
 
 import en from '../translations/en.json'
-import fr from '../translations/fr.json'
 import es from '../translations/es.json'
+import fr from '../translations/fr.json'
 
 import api from './api'
 import db from './db'
@@ -21,9 +21,10 @@ const entryPoint: sdk.ModuleEntryPoint = {
   translations: { en, fr, es },
   definition: {
     name: 'bot-improvement',
-    menuIcon: 'thumbs_up_down',
+    menuIcon: 'thumbs-up',
     menuText: 'Bot Improvement',
     noInterface: false,
+    experimental: true,
     fullName: 'Bot Improvement',
     homepage: 'https://botpress.io'
   }
