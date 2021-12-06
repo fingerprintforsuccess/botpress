@@ -54,8 +54,7 @@ class MessageList extends React.Component<MessageListProps, State> {
     // this should account for keyboard rendering as it triggers a resize of the messagesDiv
     this.divSizeObserver = new ResizeObserver(
       debounce(
-        ([divResizeEntry]) => {
-          // we don't need to do anything with the resize entry
+        ([_divResizeEntry]) => {
           this.tryScrollToBottom()
         },
         200,
@@ -68,6 +67,13 @@ class MessageList extends React.Component<MessageListProps, State> {
   componentWillUnmount() {
     this.divSizeObserver.disconnect()
     if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll); }
+  }
+
+  componentDidUpdate() {
+    if (this.state.manualScroll) {
+      return
+    }
+    this.tryScrollToBottom()
   }
 
   tryScrollToBottom(delayed?: boolean) {
@@ -125,19 +131,20 @@ class MessageList extends React.Component<MessageListProps, State> {
 
   renderMessageGroups() {
     const messages = (this.props.currentMessages || []).filter(m => this.shouldDisplayMessage(m))
-    const groups = []
+    const groups: Message[][] = []
 
     let lastSpeaker = undefined
     let lastDate = undefined
     let currentGroup = undefined
 
     messages.forEach(m => {
-      const speaker = m.payload.from || m.full_name
-      const date = m.sent_on
+      const speaker = m.payload.channel?.web?.userName || m.authorId
+      const date = m.sentOn
 
       // Create a new group if messages are separated by more than X minutes or if different speaker
       if (
         speaker !== lastSpeaker ||
+        !currentGroup ||
         differenceInMinutes(new Date(date), new Date(lastDate)) >= constants.TIME_BETWEEN_DATES
       ) {
         currentGroup = []
@@ -160,35 +167,36 @@ class MessageList extends React.Component<MessageListProps, State> {
       }
 
       currentGroup.push({
-        sent_on: new Date(),
+        sentOn: new Date(),
         userId: undefined,
-        message_type: 'typing'
+        payload: { type: 'typing' }
       })
     }
     return (
       <div>
         {groups.map((group, i) => {
           const lastGroup = groups[i - 1]
-          const lastDate = lastGroup?.[lastGroup.length - 1]?.sent_on
-          const groupDate = group?.[0].sent_on
+          const lastDate = lastGroup?.[lastGroup.length - 1]?.sentOn
+          const groupDate = group?.[0].sentOn
 
           const isDateNeeded =
             !groups[i - 1] ||
             differenceInMinutes(new Date(groupDate), new Date(lastDate)) > constants.TIME_BETWEEN_DATES
 
-          const [{ userId, full_name: userName, avatar_url: avatarUrl }] = group
+          const [{ authorId, payload }] = group
 
-          const avatar = userId
-            ? this.props.showUserAvatar && this.renderAvatar(userName, avatarUrl)
-            : this.renderAvatar(this.props.botName, avatarUrl || this.props.botAvatarUrl)
+          const avatar = authorId
+            ? this.props.showUserAvatar &&
+              this.renderAvatar(payload.channel?.web?.userName, payload.channel?.web?.avatarUrl)
+            : this.renderAvatar(this.props.botName, payload.channel?.web?.avatarUrl || this.props.botAvatarUrl)
 
           return (
             <div key={i}>
-              {isDateNeeded && this.renderDate(group[0].sent_on)}
+              {isDateNeeded && this.renderDate(group[0].sentOn)}
               <MessageGroup
-                isBot={!userId}
+                isBot={!authorId}
                 avatar={avatar}
-                userName={userName}
+                userName={payload.channel?.web?.userName}
                 key={`msg-group-${i}`}
                 isLastGroup={i >= groups.length - 1}
                 messages={group}
@@ -201,12 +209,12 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   shouldDisplayMessage = (m: Message): boolean => {
-    return m.message_type !== 'postback'
+    return m.payload.type !== 'postback'
   }
 
   handleScroll = e => {
     const scroll = this.messagesDiv.scrollHeight - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
-    const manualScroll = scroll >= 1
+    const manualScroll = scroll > 0
     const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
 
     this.setState({ manualScroll, showNewMessageIndicator })

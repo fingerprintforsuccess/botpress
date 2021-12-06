@@ -6,13 +6,14 @@ import chalk from 'chalk'
 import cluster from 'cluster'
 import { BotpressApp, createApp, createLoggerProvider } from 'core/app/core-loader'
 import { ModuleConfigEntry } from 'core/config'
-import { centerText, LoggerProvider } from 'core/logger'
+import { LoggerProvider } from 'core/logger'
 import { ModuleLoader, ModuleResolver } from 'core/modules'
 import fs from 'fs'
 import { AppLifecycle, AppLifecycleEvents } from 'lifecycle'
 import _ from 'lodash'
 import { setupMasterNode, setupWebWorker, WorkerType } from 'orchestrator'
 import os from 'os'
+import { showBanner } from './banner'
 
 async function setupEnv(app: BotpressApp) {
   await app.database.initialize()
@@ -142,6 +143,7 @@ async function start() {
 
   const resolver = new ModuleResolver(logger)
 
+  // eslint-disable-next-line prefer-const
   let { loadedModules, erroredModules } = await resolveModules(enabledModules, resolver)
 
   // These channels were removed on 12.24.0.
@@ -153,11 +155,7 @@ async function start() {
     process.LOADED_MODULES[loadedModule.entryPoint.definition.name] = loadedModule.moduleLocation
   }
 
-  logger.info(chalk`========================================
-{bold ${centerText('Botpress Server', 40, 9)}}
-{dim ${centerText(`Version ${sdk.version}`, 40, 9)}}
-{dim ${centerText(`OS ${process.distro}`, 40, 9)}}
-${_.repeat(' ', 9)}========================================`)
+  showBanner({ title: 'Botpress Server', version: sdk.version, logScopeLength: 9, bannerWidth: 75, logger })
 
   if (!fs.existsSync(process.APP_DATA_PATH)) {
     try {
@@ -217,8 +215,17 @@ This is a fatal error, process will exit.`
 
   // This ensures that the last log displayed is the correct URL
   await AppLifecycle.waitFor(AppLifecycleEvents.STUDIO_READY)
-  logger.info(`Botpress is listening at: ${process.LOCAL_URL}`)
-  logger.info(`Botpress is exposed at: ${process.EXTERNAL_URL}`)
+
+  logger.info('')
+  logger.info('='.repeat(75))
+  logger.info('-->  Documentation is available at    📘 https://botpress.com/docs')
+  logger.info('-->  Ask your questions on            👥 https://forum.botpress.com')
+  logger.info('='.repeat(75))
+  logger.info('')
+
+  logger.info(chalk.bold('Botpress is ready. open the Studio in your favorite browser.'))
+  logger.info(chalk.bold(`Botpress is listening at ${process.LOCAL_URL} (browser)`))
+  logger.info(chalk.bold(`Botpress is exposed at ${process.EXTERNAL_URL}`))
 }
 
 start().catch(global.printErrorDefault)

@@ -31,6 +31,7 @@ export const addErrorToEvent = (eventError: sdk.IO.EventError, event: sdk.IO.Eve
 
 const eventsFields = [
   'id',
+  'messageId',
   'botId',
   'channel',
   'threadId',
@@ -102,7 +103,7 @@ export class EventCollector {
       throw new Error("Can't store event missing required fields (botId, channel, direction)")
     }
 
-    const { id, botId, channel, threadId, target, direction, type } = event
+    const { id, botId, channel, threadId, target, direction, type, messageId } = event
 
     const incomingEventId = (event as sdk.IO.OutgoingEvent).incomingEventId
     const sessionId = SessionIdFactory.createIdFromEvent(event)
@@ -111,6 +112,7 @@ export class EventCollector {
 
     const entry: sdk.IO.StoredEvent = {
       id,
+      messageId,
       botId,
       channel,
       threadId,
@@ -122,11 +124,12 @@ export class EventCollector {
       success: activeWorkflow?.success,
       incomingEventId: event.direction === 'outgoing' ? incomingEventId : id,
       event: ignoredProps.length ? (_.omit(event, ignoredProps) as sdk.IO.Event) : event,
-      createdOn: this.knex.date.now()
+      createdOn: this.knex.date.format(new Date())
     }
 
     const existingIndex = this.batch.findIndex(x => x.id === id)
     if (existingIndex !== -1) {
+      entry.createdOn = this.batch[existingIndex].createdOn
       this.batch.splice(existingIndex, 1, entry)
     } else {
       this.batch.push(entry)

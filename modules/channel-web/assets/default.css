@@ -126,6 +126,10 @@ body {
   align-items: flex-start;
 }
 
+.bpw-file-button {
+  padding: 0;
+}
+
 .bpw-button-alt {
   background-color: var(--main-bg-color);
   font-size: 1rem;
@@ -406,7 +410,8 @@ body {
   padding: 0.5rem 0.75rem;
 }
 
-.bpw-bubble-file a {
+.bpw-bubble-file a,
+.bpw-bubble-image a {
   cursor: pointer;
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
@@ -414,7 +419,9 @@ body {
   border-bottom-left-radius: inherit;
 }
 
-.bpw-bubble-file a img {
+.bpw-bubble-image a img,
+.bpw-bubble-audio audio,
+.bpw-bubble-video video {
   max-height: 240px;
   max-width: 100%;
   border-top-left-radius: inherit;
@@ -642,6 +649,10 @@ body {
   padding: 5px;
 }
 
+.bpw-composer-textarea {
+  flex-grow: 2;
+}
+
 .bpw-composer textarea {
   font: inherit;
   background-color: transparent;
@@ -663,7 +674,7 @@ body {
 
 .bpw-send-buttons {
   display: flex;
-  align-items: center;
+  flex-direction: row;
 }
 
 .bpw-send-button {

@@ -74,6 +74,10 @@ class Message extends Component<MessageProps> {
     return <FileMessage file={this.props.payload} escapeTextHTML={this.props.store.escapeHTML} />
   }
 
+  render_image() {
+    return <FileMessage file={this.props.payload} escapeTextHTML={this.props.store.escapeHTML} />
+  }
+
   render_file() {
     return <FileMessage file={this.props.payload} escapeTextHTML={this.props.store.escapeHTML} />
   }
@@ -106,7 +110,7 @@ class Message extends Component<MessageProps> {
     delete messageDataProps.component
 
     const sanitizedProps = pick(this.props, [
-      'incomingEventId',
+      'messageId',
       'isLastGroup',
       'isLastOfGroup',
       'isBotMessage',
@@ -156,8 +160,8 @@ class Message extends Component<MessageProps> {
     )
   }
 
-  onMessageClicked() {
-    this.props.store.loadEventInDebugger(this.props.incomingEventId, true)
+  async onMessageClicked() {
+    await this.props.store.loadEventInDebugger(this.props.messageId, true)
   }
 
   render() {

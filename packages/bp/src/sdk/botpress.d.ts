@@ -98,7 +98,7 @@ declare module 'botpress/sdk' {
 
   export interface Logger {
     forBot(botId: string): this
-    attachError(error: Error): this
+    attachError(error: unknown): this
     /**
      * Attaching an event to the log entry will display the associated logs in the Processing tab on the debugger
      */
@@ -472,6 +472,7 @@ declare module 'botpress/sdk' {
       nlu?: Partial<EventUnderstanding>
       incomingEventId?: string
       debugger?: boolean
+      messageId?: string
     }
 
     /**
@@ -482,6 +483,8 @@ declare module 'botpress/sdk' {
     export type Event = EventDestination & {
       /** A sortable unique identifier for that event (time-based) */
       readonly id: string
+      /** Id of the corresponding message in the messaging server */
+      messageId?: string
       /** The type of the event, i.e. image, text, timeout, etc */
       readonly type: string
       /** Is it (in)coming from the user to the bot or (out)going from the bot to the user? */
@@ -538,6 +541,7 @@ declare module 'botpress/sdk' {
 
     export interface EventUnderstanding {
       readonly errored: boolean
+      readonly modelId: string | undefined
 
       readonly predictions?: {
         [context: string]: {
@@ -698,6 +702,7 @@ declare module 'botpress/sdk' {
     export type StoredEvent = {
       /** This ID is automatically generated when inserted in the DB  */
       readonly id: string
+      readonly messageId?: string
       direction: EventDirection
       /** Outgoing events will have the incoming event ID, if they were triggered by one */
       incomingEventId?: string
@@ -1424,6 +1429,7 @@ declare module 'botpress/sdk' {
       description: string
       target?: 'core' | 'bot'
       type: 'database' | 'config' | 'content'
+      canDryRun?: boolean
     }
     up: (opts: ModuleMigrationOpts) => Promise<MigrationResult>
     down?: (opts: ModuleMigrationOpts) => Promise<MigrationResult>
@@ -1440,6 +1446,7 @@ declare module 'botpress/sdk' {
   /** These are additional information that Botpress may pass down to migrations (for ex: running bot-specific migration) */
   export interface MigrationMetadata {
     botId?: string
+    isDryRun?: boolean
   }
 
   /**
@@ -1569,6 +1576,12 @@ declare module 'botpress/sdk' {
     title?: string | MultiLangText
   }
 
+  export interface FileContentType extends Content {
+    type: 'file'
+    file: string
+    title?: string | MultiLangText
+  }
+
   export enum ButtonAction {
     SaySomething = 'Say something',
     OpenUrl = 'Open URL',
@@ -1600,6 +1613,17 @@ declare module 'botpress/sdk' {
 
   export interface ChoiceOption {
     title: string | MultiLangText
+    value: string
+  }
+
+  export interface DropdownContent extends Content {
+    type: 'dropdown'
+    message: string | MultiLangText
+    options: DropdownOption[]
+  }
+
+  export interface DropdownOption {
+    label: string | MultiLangText
     value: string
   }
 
@@ -1811,7 +1835,11 @@ declare module 'botpress/sdk' {
      * @param eventDestination - The destination to identify the target
      * @param payloads - One or multiple payloads to send
      */
-    export function replyToEvent(eventDestination: IO.EventDestination, payloads: any[], incomingEventId?: string): void
+    export function replyToEvent(
+      eventDestination: IO.EventDestination,
+      payloads: any[],
+      incomingEventId?: string
+    ): Promise<void>
 
     /**
      * Return the state of the incoming queue. True if there are any events(messages)
