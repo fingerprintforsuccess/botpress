@@ -73,5 +73,5 @@ async function zipFiles(modulePath, outPath) {
 
   debug(`Zipping ${files.length} file${files.length === 1 ? '' : 's'}...`)
 
-  await tar.create({ gzip: true, follow: true, file: outPath, portable: true }, files)
+  await tar.create({ sync: true, gzip: true, follow: true, file: outPath, portable: true }, files)
 }
