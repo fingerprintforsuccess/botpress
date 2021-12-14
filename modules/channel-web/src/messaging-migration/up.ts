@@ -101,16 +101,16 @@ export abstract class MessagingUpMigrator {
       return
     }
 
-    let subquery = `SELECT "web_user_map"."userId" FROM "web_user_map" WHERE "web_user_map"."visitorId" = "${table}"."${column}"`
+    let query = `
+      UPDATE "${table}" AS tar
+      SET tar."${column}" = map."userId"
+      FROM "web_user_map" AS map
+      WHERE map."visitorId" = tar."${column}"
+    `
     if (botIdColumn) {
-      subquery += ` AND "web_user_map"."botId" = "${table}"."${botIdColumn}"`
+      query += `AND map."botId" = "${table}"."${botIdColumn}"`
     }
-    subquery += ' LIMIT 1'
-
-    await this.trx.raw(`
-      UPDATE "${table}"
-      SET "${column}" = (${subquery})
-      WHERE EXISTS (${subquery})`)
+    await this.trx.raw(query)
   }
 
   private async updateConvoReferences(table: string, column: string) {
@@ -118,8 +118,8 @@ export abstract class MessagingUpMigrator {
       return
     }
 
-    const subquery = `SELECT "temp_new_convo_ids"."newId" 
-    FROM "temp_new_convo_ids" 
+    const subquery = `SELECT "temp_new_convo_ids"."newId"
+    FROM "temp_new_convo_ids"
     WHERE "temp_new_convo_ids"."oldId"${this.bp.database.isLite ? '' : '::varchar'} = "${table}"."${column}"`
 
     await this.trx.raw(`
