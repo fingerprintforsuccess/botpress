@@ -103,12 +103,12 @@ export abstract class MessagingUpMigrator {
 
     let query = `
       UPDATE "${table}" AS tar
-      SET tar."${column}" = map."userId"
+      SET "${column}" = map."userId"
       FROM "web_user_map" AS map
       WHERE map."visitorId" = tar."${column}"
     `
     if (botIdColumn) {
-      query += `AND map."botId" = "${table}"."${botIdColumn}"`
+      query += `AND map."botId" = tar."${botIdColumn}"`
     }
     await this.trx.raw(query)
   }
@@ -118,14 +118,17 @@ export abstract class MessagingUpMigrator {
       return
     }
 
-    const subquery = `SELECT "temp_new_convo_ids"."newId"
-    FROM "temp_new_convo_ids"
-    WHERE "temp_new_convo_ids"."oldId"${this.bp.database.isLite ? '' : '::varchar'} = "${table}"."${column}"`
+    // const subquery = `SELECT "temp_new_convo_ids"."newId"
+    // FROM "temp_new_convo_ids"
+    // WHERE "temp_new_convo_ids"."oldId"${this.bp.database.isLite ? '' : '::varchar'} = "${table}"."${column}"`
 
-    await this.trx.raw(`
-    UPDATE "${table}"
-    SET "${column}" = (${subquery})
-    WHERE EXISTS (${subquery})`)
+    const query = `
+      UPDATE "${table}"
+      SET "${column}" = tmp."newId"
+      FROM "temp_new_convo_ids" AS tmp
+      WHERE tmp."oldId"::varchar = "${table}"."${column}"`
+
+    await this.trx.raw(query)
   }
 
   protected async cleanup() {
@@ -210,6 +213,7 @@ export abstract class MessagingUpMigrator {
       table.string('visitorId')
       table.uuid('userId').unique()
       table.primary(['botId', 'visitorId'])
+      table.index(['visitorId'])
     })
 
     await this.trx.schema.dropTableIfExists('temp_new_convo_ids')
