@@ -4,7 +4,7 @@ import { AxiosInstance } from 'axios'
 import { StoredToken, TokenUser, TokenResponse } from 'common/typings'
 import moment from 'moment'
 import ms from 'ms'
-import nanoid from 'nanoid'
+import { nanoid } from 'nanoid'
 import storage from '../utils/storage'
 
 export const TOKEN_KEY = 'bp/token'
@@ -50,14 +50,24 @@ export const tokenNeedsRefresh = () => {
 }
 
 export const logout = async (getAxiosClient: () => AxiosInstance) => {
-  await getAxiosClient()
-    .post('/admin/auth/logout')
-    .catch(() => {})
+  let url = ''
+  try {
+    const resp = await getAxiosClient().get('/admin/auth/logout')
 
-  // Clear access token and ID token from local storage
-  localStorage.removeItem(TOKEN_KEY)
-  // need to force reload otherwise the token wont clear properly
-  window.location.href = window.location.origin + window['ROOT_PATH']
+    url = resp.data.url
+  } catch {
+    // Silently fails
+  } finally {
+    storage.del(TOKEN_KEY)
+
+    if (url) {
+      // If /logout gave us a URL, manually redirect to this URL
+      window.location.replace(url)
+    } else {
+      // need to force reload otherwise the token wont clear properly
+      window.location.href = window.location.origin + window['ROOT_PATH']
+    }
+  }
 }
 
 export const setVisitorId = (userId: string, userIdScope?: string) => {
