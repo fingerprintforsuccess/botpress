@@ -29,6 +29,7 @@ class MessageList extends React.Component<MessageListProps, State> {
 
     this.setState({
       autoscroll: window.setInterval(() => {
+        console.log('AUTOSCROLL')
         if (!this.state.manualScroll) {
           this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
         }
