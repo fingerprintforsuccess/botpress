@@ -1,4 +1,5 @@
 import { ResizeObserver } from '@juggle/resize-observer'
+import { isThisSecond } from 'date-fns'
 import differenceInMinutes from 'date-fns/difference_in_minutes'
 import debounce from 'lodash/debounce'
 import { observe } from 'mobx'
@@ -27,18 +28,20 @@ class MessageList extends React.Component<MessageListProps, State> {
   componentDidMount() {
     this.tryScrollToBottom(true)
 
-    this.setState({
+    // old botpress code if scrollsnap not supported
+    if(!CSS.supports('scroll-snap-type: y mandatory')){
+      this.setState({
       autoscroll: window.setInterval(() => {
         if (!this.state.manualScroll && !this.props.isBotTyping.get()) {
-          console.log('AUTOSCROLL');
           this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight + 500
         }
       }, 100)
-    })
+      })
 
-    observe(this.props.focusedArea, focus => {
-      focus.newValue === 'convo' && this.messagesDiv.focus()
-    })
+      observe(this.props.focusedArea, focus => {
+        focus.newValue === 'convo' && this.messagesDiv.focus()
+      }) 
+    }    
 
     if (this.props.currentMessages) {
       observe(this.props.currentMessages, messages => {
@@ -48,41 +51,67 @@ class MessageList extends React.Component<MessageListProps, State> {
           }
           return
         }
-        this.tryScrollToBottom()
+        // old botpress code if scrollsnap not supported
+        if(!CSS.supports('scroll-snap-type: y mandatory')){
+          this.tryScrollToBottom()
+        }
+
       })
     }
 
-    // this should account for keyboard rendering as it triggers a resize of the messagesDiv
-    this.divSizeObserver = new ResizeObserver(
-      debounce(
-        ([_divResizeEntry]) => {
-          this.tryScrollToBottom()
-        },
-        200,
-        { trailing: true }
+    // old botpress code if scrollsnap not supported
+    if(!CSS.supports('scroll-snap-type: y mandatory')){
+      //this should account for keyboard rendering as it triggers a resize of the messagesDiv
+      this.divSizeObserver = new ResizeObserver(
+        debounce(
+          ([_divResizeEntry]) => {
+            this.tryScrollToBottom()
+          },
+          200,
+          { trailing: true }
+        )
       )
-    )
-    this.divSizeObserver.observe(this.messagesDiv)
+      this.divSizeObserver.observe(this.messagesDiv)
+    }
+    
   }
 
   componentWillUnmount() {
-    this.divSizeObserver.disconnect()
-    if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll); }
+    // old botpress code if scrollsnap not supported
+    if(!CSS.supports('scroll-snap-type: y mandatory')){
+      this.divSizeObserver.disconnect()
+      if (this.state.autoscroll) { window.clearInterval(this.state.autoscroll) }
+    }
   }
 
   componentDidUpdate() {
-    if (this.state.manualScroll) {
-      return
+    // old botpress code if scrollsnap not supported
+    if(!CSS.supports('scroll-snap-type: y mandatory')){
+      if (this.state.manualScroll) {
+        console.log("update manual  -> dont scroll")
+        return
+      }
+      console.log("would scroll to bottom")
+      this.tryScrollToBottom()
     }
-    this.tryScrollToBottom()
   }
 
   tryScrollToBottom(delayed?: boolean) {
     setTimeout(
       () => {
         try {
-          this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight
+          console.log('try scroll,', delayed)
+          // old botpress code if scrollsnap not supported
+          if(!CSS.supports('scroll-snap-type: y mandatory')){
+            console.log("no snap support")
+            //previous code
+            this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight
+          } else {
+            //SCROLL SNAP CODE FIX
+            this.messagesDiv.style.scrollSnapType = 'y mandatory'
+          }
         } catch (err) {
+          console.log("this is a try scroll error", err)
           // Discard the error
         }
       },
@@ -91,6 +120,7 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   handleKeyDown = e => {
+    //DOESNT WORK FOR SCROLL SNAP ATM 
     if (!this.props.enableArrowNavigation) {
       return
     }
@@ -174,7 +204,8 @@ class MessageList extends React.Component<MessageListProps, State> {
       })
     }
     return (
-      <div>
+      //Fragment to remove extra div currently found in botpress
+      <>
         {groups.map((group, i) => {
           const lastGroup = groups[i - 1]
           const lastDate = lastGroup?.[lastGroup.length - 1]?.sentOn
@@ -205,7 +236,7 @@ class MessageList extends React.Component<MessageListProps, State> {
             </div>
           )
         })}
-      </div>
+      </>
     )
   }
 
@@ -214,11 +245,26 @@ class MessageList extends React.Component<MessageListProps, State> {
   }
 
   handleScroll = e => {
-    const scroll = this.messagesDiv.scrollHeight - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
-    const manualScroll = scroll > 0
-    const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
-
-    this.setState({ manualScroll, showNewMessageIndicator })
+    // old botpress code if scrollsnap not supported
+    if(!CSS.supports('scroll-snap-type: y mandatory')){
+      console.log("handle scroll, revert to old")
+      const scroll = (this.messagesDiv.scrollHeight) - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
+      const manualScroll = scroll > 0
+      const showNewMessageIndicator = this.state.showNewMessageIndicator && manualScroll
+      this.setState({ manualScroll, showNewMessageIndicator })
+    } else {
+      //CSS Snap Solution
+      const height = (this.messagesDiv.scrollHeight) - this.messagesDiv.scrollTop - this.messagesDiv.clientHeight
+      const leftOver = (height - 20) > 0
+      if(!leftOver) {
+        this.tryScrollToBottom()
+        this.setState({manualScroll: false})
+      }
+      else {
+        this.messagesDiv.style.scrollSnapType = 'unset'
+        this.setState({manualScroll: true})
+      }
+    }
   }
 
   render() {
